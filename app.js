@@ -48,11 +48,11 @@ function initUI() {
 function attachListeners() {
     // Tab Navigation
     document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            e.target.classList.add('active');
-            document.getElementById(e.target.dataset.target).classList.add('active');
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.target).classList.add('active');
         });
     });
 
