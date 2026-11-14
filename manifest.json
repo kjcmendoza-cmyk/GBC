@@ -1,0 +1,21 @@
+{
+  "name": "GBC Sand & Gravel",
+  "short_name": "GBC Davao",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F172A",
+  "description": "Order Sand, Gravel, and Equipment Rentals in Davao City",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiBmaWxsPSIjMEYxNzJBIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIvPjwvc3ZnPg==",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSIjMEYxNzJBIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIvPjwvc3ZnPg==",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

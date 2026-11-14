@@ -1,0 +1,92 @@
+/* 3. css/styles.css */
+:root {
+    --primary: #0F172A; /* Slate 900 */
+    --secondary: #1E293B; /* Slate 800 */
+    --accent: #F59E0B; /* Amber 500 */
+    --accent-hover: #D97706; /* Amber 600 */
+    --bg-light: #F8FAFC;
+    --card-bg: #FFFFFF;
+    --text-main: #334155;
+    --text-light: #94A3B8;
+    --border: #E2E8F0;
+    --whatsapp: #25D366;
+    --messenger: #0084FF;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+body { background-color: var(--bg-light); color: var(--text-main); line-height: 1.5; }
+
+.main-header { background: var(--primary); color: white; padding: 1.5rem 1rem; text-align: center; }
+.header-container { max-width: 800px; margin: 0 auto; }
+.brand-name { font-size: 1.8rem; font-weight: 800; letter-spacing: 1px; margin-bottom: 0.2rem; }
+.accent-text { color: var(--accent); }
+.tagline { color: var(--text-light); font-size: 0.9rem; margin-bottom: 0.5rem; }
+.contact-info a { color: white; text-decoration: none; font-weight: bold; }
+
+.app-container { max-width: 800px; margin: 0 auto; padding: 1rem; }
+
+/* Tabs */
+.tab-nav { display: flex; background: var(--secondary); margin-bottom: 1rem; border-radius: 8px; overflow: hidden; }
+.tab-btn { flex: 1; background: none; border: none; color: white; padding: 1rem 0.5rem; font-weight: 600; cursor: pointer; transition: 0.3s; font-size: 0.9rem; }
+.tab-btn.active { background: var(--accent); color: white; }
+.tab-content { display: none; background: var(--card-bg); padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+.tab-content.active { display: block; }
+.tab-content h2 { margin-bottom: 0.5rem; color: var(--primary); }
+.sub-text { font-size: 0.85rem; color: var(--text-light); margin-bottom: 1rem; }
+
+/* Forms & Inputs */
+.form-group { margin-bottom: 1.2rem; }
+.form-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; }
+input[type="text"], input[type="number"], input[type="tel"], input[type="email"], input[type="password"], input[type="date"], select, textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; }
+.input-row { display: flex; gap: 0.5rem; }
+
+/* Stepper */
+.stepper-group { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap:10px; }
+.stepper { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; width: 150px; }
+.btn-step { background: var(--bg-light); border: none; padding: 0.75rem 1rem; cursor: pointer; font-size: 1.2rem; font-weight: bold; color: var(--primary); }
+.stepper input { border: none; text-align: center; border-radius: 0; width: 100%; -moz-appearance: textfield; appearance: textfield; }
+.stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
+
+/* Cards & Grid */
+.material-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.mat-card { border: 2px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: 0.2s; }
+.mat-card.selected { border-color: var(--accent); background: #FFFBEB; }
+.mat-card h4 { margin-bottom: 0.3rem; }
+.featured-card { background: var(--primary); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border-left: 4px solid var(--accent); }
+
+/* Buttons */
+.btn { padding: 0.75rem 1.5rem; border: none; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.2s; text-align: center; }
+.btn-block { display: block; width: 100%; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: var(--secondary); color: white; }
+.btn-whatsapp { background: var(--whatsapp); color: white; }
+.btn-messenger { background: var(--messenger); color: white; }
+
+/* Summaries */
+.price-summary { background: var(--bg-light); padding: 1rem; border-radius: 8px; margin: 1.5rem 0; border: 1px solid var(--border); }
+.summary-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.95rem; }
+.summary-total { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.2rem; border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.5rem; color: var(--primary); }
+
+/* Modals */
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.8); padding: 1rem; align-items: center; justify-content: center; }
+.modal-content { background: var(--card-bg); padding: 2rem; border-radius: 8px; max-width: 500px; width: 100%; position: relative; max-height: 90vh; overflow-y: auto; }
+.close { position: absolute; right: 1.5rem; top: 1.2rem; font-size: 1.5rem; font-weight: bold; cursor: pointer; }
+
+/* Utilities */
+.tag-amber { background: #FEF3C7; color: #D97706; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+.checkbox-group { display: flex; align-items: flex-start; gap: 0.5rem; }
+.checkbox-group input { margin-top: 0.3rem; width: auto; }
+.receipt-box { background: var(--bg-light); border: 1px dashed var(--text-light); padding: 1rem; border-radius: 6px; font-family: monospace; white-space: pre-wrap; font-size: 0.9rem; margin-top: 10px; }
+
+/* Admin Orders */
+.orders-grid { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
+.order-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.order-header { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.5rem; font-weight: bold; }
+.status-badge { padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem; text-transform: uppercase; }
+.status-pending { background: #FEF3C7; color: #D97706; }
+.status-confirmed { background: #DBEAFE; color: #1D4ED8; }
+.status-completed { background: #D1FAE5; color: #059669; }
+.photo-preview-grid { display: flex; gap: 10px; margin-top: 10px; overflow-x: auto; }
+.photo-preview-grid img { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; }

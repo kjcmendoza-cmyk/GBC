@@ -1,0 +1,264 @@
+<!-- 1. index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBC Sand, Gravel & Hauling Davao</title>
+    <meta name="description" content="Order Sand, Gravel, Hauling, and Backhoe rentals in Davao City. Fast, reliable, and transparent pricing.">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0F172A">
+    <!-- LocalBusiness Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "GBC Sand and Gravel Supply and Garbage Hauling Service Davao",
+      "image": "",
+      "@id": "",
+      "url": "",
+      "telephone": "+639174347647",
+      "email": "gbcsandandgravelsupply@gmail.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Purok 8, Waan",
+        "addressLocality": "Davao City",
+        "addressRegion": "Davao Region",
+        "addressCountry": "PH"
+      }
+    }
+    </script>
+</head>
+<body>
+    <header class="main-header">
+        <div class="header-container">
+            <h1 class="brand-name">GBC <span class="accent-text">DAVAO</span></h1>
+            <p class="tagline">Sand, Gravel, Hauling & Equipment</p>
+            <div class="contact-info">
+                <a href="tel:+639174347647">📞 0917 434 7647</a> | <a href="tel:+63939676948">0939 676 948</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="app-container">
+        <!-- Tabs -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-target="tab-supply">Sand & Gravel</button>
+            <button class="tab-btn" data-target="tab-hauling">Hauling</button>
+            <button class="tab-btn" data-target="tab-rental">Rentals</button>
+        </div>
+
+        <!-- TAB 1: Supply -->
+        <section id="tab-supply" class="tab-content active">
+            <h2>Material Supply</h2>
+            <p class="sub-text">Sold per Dump Truck Load (~2.8 to 3.0 cu.m.)</p>
+            
+            <div class="material-grid" id="material-list">
+                <!-- Injected via JS -->
+            </div>
+
+            <div class="form-group stepper-group">
+                <label>Number of Loads:</label>
+                <div class="stepper">
+                    <button type="button" class="btn-step" id="supply-minus">-</button>
+                    <input type="number" id="supply-qty" value="1" min="1" readonly>
+                    <button type="button" class="btn-step" id="supply-plus">+</button>
+                </div>
+                <small id="supply-vol-estimate">Approx. 2.8 - 3.0 cu.m.</small>
+            </div>
+
+            <details class="volume-helper">
+                <summary>Not sure how many loads? Use our Volume Calculator</summary>
+                <div class="helper-content">
+                    <div class="input-row">
+                        <input type="number" id="calc-l" placeholder="Length (m)">
+                        <input type="number" id="calc-w" placeholder="Width (m)">
+                        <input type="number" id="calc-d" placeholder="Depth (cm)">
+                    </div>
+                    <p>Required: <span id="calc-result">0</span> cu.m. (<span id="calc-loads">0</span> loads)</p>
+                    <button type="button" id="btn-apply-calc" class="btn btn-secondary">Apply to Order</button>
+                </div>
+            </details>
+
+            <div class="form-group">
+                <label for="supply-brgy">Delivery Barangay:</label>
+                <select id="supply-brgy" class="brgy-select"></select>
+            </div>
+            
+            <div class="form-group">
+                <label for="supply-date">Delivery Date:</label>
+                <input type="date" id="supply-date">
+            </div>
+
+            <div class="price-summary">
+                <div class="summary-row"><span>Material Cost:</span> <span id="supply-mat-cost">₱0.00</span></div>
+                <div class="summary-row"><span>Delivery Fee:</span> <span id="supply-del-fee">₱0.00</span></div>
+                <div class="summary-total"><span>Total Estimate:</span> <span id="supply-total">₱0.00</span></div>
+            </div>
+            
+            <button class="btn btn-primary btn-block" onclick="prepareCheckout('supply')">Continue to Checkout</button>
+        </section>
+
+        <!-- TAB 2: Hauling -->
+        <section id="tab-hauling" class="tab-content">
+            <h2>Garbage & Debris Hauling</h2>
+            <div class="form-group">
+                <label for="hauling-type">Waste Category:</label>
+                <select id="hauling-type">
+                    <option value="Construction Debris">Construction Debris</option>
+                    <option value="Green Waste">Green Waste / Tree Trimmings</option>
+                    <option value="Mixed Junk">Mixed / Household Junk</option>
+                </select>
+            </div>
+
+            <div class="form-group stepper-group">
+                <label>Estimated Loads:</label>
+                <div class="stepper">
+                    <button type="button" class="btn-step" id="hauling-minus">-</button>
+                    <input type="number" id="hauling-qty" value="1" min="1" readonly>
+                    <button type="button" class="btn-step" id="hauling-plus">+</button>
+                </div>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="hauling-backhoe">
+                <label for="hauling-backhoe">Include Komatsu PC30 Mini Backhoe for heavy loading <span class="tag-amber">(+Fee)</span></label>
+            </div>
+
+            <div class="form-group">
+                <label>Upload Photos of Waste Pile (Max 3):</label>
+                <input type="file" id="hauling-photos" accept="image/*" multiple>
+                <div id="photo-preview" class="photo-preview-grid"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="hauling-brgy">Location (Barangay):</label>
+                <select id="hauling-brgy" class="brgy-select"></select>
+            </div>
+            
+            <div class="form-group">
+                <label for="hauling-date">Preferred Date:</label>
+                <input type="date" id="hauling-date">
+            </div>
+
+            <div class="price-summary">
+                <div class="summary-row"><span>Hauling Fee:</span> <span id="hauling-fee">₱0.00</span></div>
+                <div class="summary-row" id="hauling-backhoe-row" style="display:none;"><span>Backhoe Loading:</span> <span id="hauling-backhoe-fee">₱0.00</span></div>
+                <div class="summary-row"><span>Location Surcharge:</span> <span id="hauling-loc-fee">₱0.00</span></div>
+                <div class="summary-total"><span>Total Estimate:</span> <span id="hauling-total">₱0.00</span></div>
+            </div>
+
+            <button class="btn btn-primary btn-block" onclick="prepareCheckout('hauling')">Continue to Checkout</button>
+        </section>
+
+        <!-- TAB 3: Rental -->
+        <section id="tab-rental" class="tab-content">
+            <h2>Equipment Rentals</h2>
+            <div class="featured-card">
+                <h3>Komatsu PC30 Mini Backhoe</h3>
+                <p>Operator Included. Features: 1.55m ultra-compact width (fits tight alleys), rubber tracks (safe on concrete), ~3.15m dig depth.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="rental-job">Job Type:</label>
+                <select id="rental-job">
+                    <option value="Foundation">Foundation / Septic Tank Digging</option>
+                    <option value="Lot Clearing">Lot Clearing & Leveling</option>
+                    <option value="Trenching">Drainage / Utility Trenching</option>
+                    <option value="Demolition">Demolition & Site Prep</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="rental-date">Start Date:</label>
+                <input type="date" id="rental-date">
+            </div>
+
+            <div class="form-group stepper-group">
+                <label>Number of Days:</label>
+                <div class="stepper">
+                    <button type="button" class="btn-step" id="rental-minus">-</button>
+                    <input type="number" id="rental-qty" value="1" min="1" max="14" readonly>
+                    <button type="button" class="btn-step" id="rental-plus">+</button>
+                </div>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="rental-hauling">
+                <label for="rental-hauling">Add Dump Truck Hauling (Clearing + Disposal Bundle)</label>
+            </div>
+            
+            <div id="rental-hauling-options" style="display:none;" class="form-group stepper-group">
+                <label>Est. Hauling Loads:</label>
+                <div class="stepper">
+                    <button type="button" class="btn-step" id="rental-haul-minus">-</button>
+                    <input type="number" id="rental-haul-qty" value="1" min="1" readonly>
+                    <button type="button" class="btn-step" id="rental-haul-plus">+</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="rental-brgy">Mobilization Barangay:</label>
+                <select id="rental-brgy" class="brgy-select"></select>
+            </div>
+
+            <div class="price-summary">
+                <div class="summary-row"><span>Daily Rate x Days:</span> <span id="rental-base">₱0.00</span></div>
+                <div class="summary-row"><span>Mobilization Fee:</span> <span id="rental-mob">₱0.00</span></div>
+                <div class="summary-row" id="rental-haul-row" style="display:none;"><span>Hauling Add-on:</span> <span id="rental-haul-fee">₱0.00</span></div>
+                <div class="summary-total"><span>Total Estimate:</span> <span id="rental-total">₱0.00</span></div>
+            </div>
+
+            <button class="btn btn-primary btn-block" onclick="prepareCheckout('rental')">Continue to Checkout</button>
+        </section>
+    </main>
+
+    <!-- Checkout Modal -->
+    <div id="checkout-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('checkout-modal')">&times;</span>
+            <h2>Complete Your Order</h2>
+            <form id="checkout-form">
+                <div class="form-group">
+                    <label>Full Name:</label>
+                    <input type="text" id="cust-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Mobile Number:</label>
+                    <input type="tel" id="cust-phone" required pattern="[0-9]{11}" placeholder="09xxxxxxxxx">
+                </div>
+                <div class="form-group">
+                    <label>Exact Street/Purok Landmark:</label>
+                    <textarea id="cust-address" required rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Notes (Optional):</label>
+                    <textarea id="cust-notes" rows="2"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Submit Order</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div id="receipt-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="accent-text">Ticket Created!</h2>
+            <p>Your Ticket ID: <strong id="receipt-ticket"></strong></p>
+            <div class="receipt-box" id="receipt-summary"></div>
+            <p class="sub-text" style="margin-top:10px;">To finalize scheduling, please send this ticket to our dispatch team:</p>
+            <button id="btn-whatsapp" class="btn btn-whatsapp btn-block">Confirm via WhatsApp</button>
+            <button id="btn-messenger" class="btn btn-messenger btn-block">Copy & Open Messenger</button>
+            <button class="btn btn-secondary btn-block" onclick="window.location.reload()" style="margin-top:15px;">Close & Start New</button>
+        </div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>

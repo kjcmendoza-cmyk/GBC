@@ -1,0 +1,126 @@
+<!-- 2. admin.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - GBC Dispatch</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <meta name="theme-color" content="#0F172A">
+</head>
+<body class="admin-body">
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-container">
+        <div class="login-box">
+            <h2>GBC Dispatch Login</h2>
+            <p id="login-error" style="color:red; display:none;"></p>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="admin-email" required>
+                </div>
+                <div class="form-group">
+                    <label>Password:</label>
+                    <input type="password" id="admin-password" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Login</button>
+            </form>
+            <p class="sub-text" style="margin-top:15px"><em>Demo Mode Active: Any credentials will work locally.</em></p>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-dashboard" style="display:none;">
+        <header class="main-header admin-header">
+            <div class="header-container" style="display:flex; justify-content:space-between; align-items:center;">
+                <h1 class="brand-name">GBC <span class="accent-text">DISPATCH</span></h1>
+                <button id="btn-logout" class="btn btn-secondary" style="padding: 5px 10px; font-size:12px;">Logout</button>
+            </div>
+        </header>
+
+        <div class="tab-nav">
+            <button class="tab-btn active" data-target="admin-orders">Live Orders</button>
+            <button class="tab-btn" data-target="admin-settings">Rates & Fleet</button>
+        </div>
+
+        <!-- TAB A: Orders -->
+        <main id="admin-orders" class="tab-content active app-container">
+            <div class="filters">
+                <select id="status-filter">
+                    <option value="All">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                <button class="btn btn-secondary" onclick="document.getElementById('block-date-modal').style.display='block'">+ Block Date</button>
+            </div>
+            
+            <div id="orders-list" class="orders-grid">
+                <!-- Orders injected here -->
+            </div>
+        </main>
+
+        <!-- TAB B: Settings -->
+        <main id="admin-settings" class="tab-content app-container">
+            <h2>System Settings</h2>
+            <form id="settings-form">
+                <h3>Fleet Capacity</h3>
+                <div class="form-group input-row">
+                    <label>Dump Trucks:</label>
+                    <input type="number" id="set-trucks" required>
+                    <label>Backhoes:</label>
+                    <input type="number" id="set-backhoes" required>
+                </div>
+
+                <h3>Service Base Rates (₱)</h3>
+                <div class="form-group">
+                    <label>Hauling (Per Load):</label>
+                    <input type="number" id="set-hauling" required>
+                </div>
+                <div class="form-group">
+                    <label>Backhoe (Daily):</label>
+                    <input type="number" id="set-backhoe-daily" required>
+                </div>
+                <div class="form-group">
+                    <label>Backhoe Add-on (Hauling):</label>
+                    <input type="number" id="set-backhoe-addon" required>
+                </div>
+
+                <h3>Materials (Price per Load)</h3>
+                <div id="materials-settings"></div>
+                
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top:20px;">Save All Settings</button>
+            </form>
+        </main>
+    </div>
+
+    <!-- Manual Block Modal -->
+    <div id="block-date-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('block-date-modal')">&times;</span>
+            <h2>Manual Block Date</h2>
+            <form id="block-form">
+                <div class="form-group">
+                    <label>Resource:</label>
+                    <select id="block-resource">
+                        <option value="backhoe">PC30 Backhoe</option>
+                        <option value="truck">Dump Truck</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date:</label>
+                    <input type="date" id="block-date" required>
+                </div>
+                <div class="form-group">
+                    <label>Notes (e.g. Offline Booking):</label>
+                    <input type="text" id="block-notes">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Block Date</button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="js/admin.js"></script>
+</body>
+</html>
