@@ -1,16 +1,23 @@
-// 6. js/app.js
 import { getAppData } from './davao-data.js';
 import { DbService } from './firebase-config.js';
 
 let appData;
+let map, marker;
 let state = {
     selectedMaterial: null,
-    checkoutTab: null
+    checkoutTab: null,
+    location: {
+        lat: 7.0731,
+        lng: 125.6128,
+        address: '',
+        mapUrl: ''
+    }
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
     appData = await getAppData();
     initUI();
+    initMapPicker();
     attachListeners();
 });
 
@@ -45,8 +52,157 @@ function initUI() {
     calcRental();
 }
 
+function initMapPicker() {
+    if (typeof L === 'undefined') return;
+
+    const davaoCenter = [7.0731, 125.6128];
+    map = L.map('davao-map').setView(davaoCenter, 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+
+    marker = L.marker(davaoCenter, { draggable: true }).addTo(map);
+
+    // Drag pin
+    marker.on('dragend', () => {
+        const pos = marker.getLatLng();
+        updatePinnedLocation(pos.lat, pos.lng, true);
+    });
+
+    // Tap anywhere on map
+    map.on('click', (e) => {
+        marker.setLatLng(e.latlng);
+        updatePinnedLocation(e.latlng.lat, e.latlng.lng, true);
+    });
+
+    // GPS Button
+    document.getElementById('btn-use-gps').addEventListener('click', () => {
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser.");
+            return;
+        }
+        const label = document.getElementById('map-pinned-label');
+        label.innerText = "Locating your GPS position...";
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const { latitude, longitude } = pos.coords;
+                map.setView([latitude, longitude], 16);
+                marker.setLatLng([latitude, longitude]);
+                updatePinnedLocation(latitude, longitude, true);
+            },
+            () => {
+                label.innerText = "Unable to access GPS. Please search or tap the map.";
+            },
+            { enableHighAccuracy: true }
+        );
+    });
+
+    // Address Search Autocomplete (Biased to Davao City)
+    const searchInput = document.getElementById('map-search-input');
+    const resultsList = document.getElementById('map-search-results');
+    let debounceTimer;
+
+    searchInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        const query = searchInput.value.trim();
+        if (query.length < 3) {
+            resultsList.style.display = 'none';
+            return;
+        }
+
+        debounceTimer = setTimeout(async () => {
+            try {
+                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query + ' Davao')}&lat=7.0731&lon=125.6128&limit=5`;
+                const res = await fetch(url);
+                const data = await res.json();
+
+                resultsList.innerHTML = '';
+                if (!data.features || data.features.length === 0) {
+                    resultsList.style.display = 'none';
+                    return;
+                }
+
+                data.features.forEach(feat => {
+                    const [lng, lat] = feat.geometry.coordinates;
+                    const p = feat.properties;
+                    const displayName = [p.name, p.street, p.district, p.city].filter(Boolean).join(', ');
+
+                    const li = document.createElement('li');
+                    li.textContent = displayName;
+                    li.addEventListener('click', () => {
+                        searchInput.value = displayName;
+                        resultsList.style.display = 'none';
+                        map.setView([lat, lng], 16);
+                        marker.setLatLng([lat, lng]);
+                        updatePinnedLocation(lat, lng, false, displayName);
+                    });
+                    resultsList.appendChild(li);
+                });
+                resultsList.style.display = 'block';
+            } catch (err) {
+                console.error("Map search error:", err);
+            }
+        }, 350);
+    });
+
+    // Hide search results when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.map-search-wrap')) {
+            resultsList.style.display = 'none';
+        }
+    });
+}
+
+async function updatePinnedLocation(lat, lng, reverseLookup = true, presetAddress = '') {
+    const label = document.getElementById('map-pinned-label');
+    const mapUrl = `https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
+    let resolvedAddress = presetAddress;
+
+    if (reverseLookup) {
+        label.innerText = "Fetching street address...";
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+            const data = await res.json();
+            resolvedAddress = data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        } catch {
+            resolvedAddress = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        }
+    }
+
+    state.location = { lat, lng, address: resolvedAddress, mapUrl };
+    label.innerHTML = `<strong>Pinned:</strong> ${resolvedAddress}`;
+
+    // Pre-fill checkout address box & sync district fee
+    const custAddressEl = document.getElementById('cust-address');
+    if (custAddressEl) custAddressEl.value = resolvedAddress;
+
+    autoMatchBarangayFee(resolvedAddress);
+}
+
+function autoMatchBarangayFee(addressText) {
+    const lower = addressText.toLowerCase();
+    const keywords = ['poblacion', 'agdao', 'buhangin', 'talomo', 'toril', 'tugbok', 'calinan', 'waan'];
+    const matched = keywords.find(k => lower.includes(k));
+    if (!matched) return;
+
+    document.querySelectorAll('.brgy-select').forEach(select => {
+        for (let i = 0; i < select.options.length; i++) {
+            if (select.options[i].value.toLowerCase().includes(matched)) {
+                select.selectedIndex = i;
+                break;
+            }
+        }
+    });
+
+    calcSupply();
+    calcHauling();
+    calcRental();
+}
+
 function attachListeners() {
-    // Tab Navigation
+    // Tab Navigation + Move Map Widget to Active Tab
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const targetSection = document.getElementById(btn.dataset.target);
@@ -58,6 +214,13 @@ function attachListeners() {
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
             targetSection.classList.add('active');
+
+            const slot = targetSection.querySelector('.map-slot');
+            const mapWrapper = document.getElementById('map-picker-wrapper');
+            if (slot && mapWrapper && map) {
+                slot.appendChild(mapWrapper);
+                setTimeout(() => map.invalidateSize(), 50);
+            }
         });
     });
 
@@ -205,7 +368,13 @@ async function handleCheckoutSubmit(e) {
         notes: document.getElementById('cust-notes').value,
     };
 
-    let orderData = { ticketId, customer: cust, status: 'pending', type: state.checkoutTab };
+    let orderData = {
+        ticketId,
+        customer: cust,
+        location: state.location,
+        status: 'pending',
+        type: state.checkoutTab
+    };
     let summaryText = `*GBC ORDER TICKET: ${ticketId}*\nName: ${cust.name}\nPhone: ${cust.phone}\nAddress: ${cust.address}\n\n*ORDER DETAILS:*\n`;
 
     if (state.checkoutTab === 'supply') {
@@ -238,6 +407,7 @@ async function handleCheckoutSubmit(e) {
     }
 
     if (cust.notes) summaryText += `\n\nNotes: ${cust.notes}`;
+    if (state.location.mapUrl) summaryText += `\n📍 Map Pin: ${state.location.mapUrl}`;
 
     await DbService.saveOrder(orderData);
 
@@ -254,7 +424,7 @@ async function handleCheckoutSubmit(e) {
     document.getElementById('btn-messenger').onclick = () => {
         navigator.clipboard.writeText(summaryText).then(() => {
             alert("Order details copied to clipboard! Paste them in the chat.");
-            window.open(`https://m.me/`, '_blank'); // Needs specific FB page ID in prod
+            window.open(`https://m.me/`, '_blank');
         });
     };
 }

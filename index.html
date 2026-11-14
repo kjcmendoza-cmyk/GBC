@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="styles.css?v=4">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2E1065">
@@ -125,7 +126,22 @@
                     </div>
                 </div>
             </details>
+            <div class="map-slot">
+    <div id="map-picker-wrapper" class="map-picker-card">
+        <div class="map-header">
+            <label for="map-search-input">Pin Exact Site Location (Davao City)</label>
+            <button type="button" id="btn-use-gps" class="btn-gps">📍 Use My GPS</button>
+        </div>
 
+        <div class="map-search-wrap">
+            <input type="text" id="map-search-input" placeholder="Search street, barangay, or landmark (e.g. Matina, Buhangin)..." autocomplete="off">
+            <ul id="map-search-results" class="map-results-list"></ul>
+        </div>
+
+        <div id="davao-map"></div>
+        <small id="map-pinned-label" class="map-coords-text">Search above, tap the map, or drag the pin to mark your exact drop-off/site spot.</small>
+    </div>
+</div>
             <div class="form-grid-2">
                 <div class="form-group">
                     <label for="supply-brgy">Delivery Barangay</label>
@@ -198,7 +214,7 @@
                 </div>
                 <div id="photo-preview" class="photo-preview-grid"></div>
             </div>
-
+<div class="map-slot"></div>
             <div class="form-grid-2">
                 <div class="form-group">
                     <label for="hauling-brgy">Pickup Barangay</label>
@@ -240,7 +256,7 @@
                     <span>Concrete-Safe Rubber Tracks</span>
                 </div>
             </div>
-
+<div class="map-slot"></div>
             <div class="form-grid-2">
                 <div class="form-group">
                     <label for="rental-job">Job Type</label>
@@ -351,7 +367,7 @@
             </div>
         </div>
     </div>
-
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
