@@ -11,16 +11,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        try {
-            await AuthService.login(document.getElementById('admin-email').value, 'password');
-            localStorage.setItem('gbc_admin_auth', 'true');
-            showDashboard();
-        } catch (error) {
-            document.getElementById('login-error').innerText = "Login Failed";
-            document.getElementById('login-error').style.display = 'block';
-        }
-    });
+    e.preventDefault();
+    const email = document.getElementById('admin-email').value;
+    const password = document.getElementById('admin-password').value;
+    try {
+        await AuthService.login(email, password);
+        localStorage.setItem('gbc_admin_auth', 'true');
+        showDashboard();
+    } catch (error) {
+        document.getElementById('login-error').innerText = "Login Failed: " + error.message;
+        document.getElementById('login-error').style.display = 'block';
+    }
+});
 
     document.getElementById('btn-logout').addEventListener('click', async () => {
         await AuthService.logout();
