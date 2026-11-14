@@ -40,15 +40,14 @@ async function showDashboard() {
     populateSettings();
 
     // Tab Logic
-    document.querySelectorAll('.admin-header ~ .tab-nav .tab-btn').forEach(btn => {
+    document.querySelectorAll('.admin-tab-nav .tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.admin-header ~ .tab-nav .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.admin-tab-nav .tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('#admin-dashboard .tab-content').forEach(c => c.classList.remove('active'));
-            e.target.classList.add('active');
-            document.getElementById(e.target.dataset.target).classList.add('active');
+            e.currentTarget.classList.add('active');
+            document.getElementById(e.currentTarget.dataset.target).classList.add('active');
         });
     });
-
     document.getElementById('status-filter').addEventListener('change', loadOrders);
     
     // Settings Submit
@@ -74,25 +73,32 @@ async function loadOrders() {
     const filter = document.getElementById('status-filter').value;
     const orders = await DbService.getOrders(filter);
     const container = document.getElementById('orders-list');
+
+    if (orders.length === 0) {
+        container.innerHTML = `<p class="sub-text" style="text-align:center; padding: 1.5rem 0;">No orders found for this filter.</p>`;
+        return;
+    }
     
     container.innerHTML = orders.map(o => `
         <div class="order-card">
             <div class="order-header">
-                <span>${o.id} - ${o.type.toUpperCase()}</span>
+                <span>${o.ticketId || o.id} • ${o.type.toUpperCase()}</span>
                 <span class="status-badge status-${o.status}">${o.status}</span>
             </div>
             <p><strong>Customer:</strong> ${o.customer.name}</p>
             <p><strong>Phone:</strong> <a href="tel:${o.customer.phone}">${o.customer.phone}</a></p>
             <p><strong>Address:</strong> ${o.customer.address}</p>
+            ${o.customer.notes ? `<p><strong>Notes:</strong> ${o.customer.notes}</p>` : ''}
+            ${o.location?.mapUrl ? `<p style="margin-top:6px;"><a href="${o.location.mapUrl}" target="_blank" style="color:#059669; font-weight:700; text-decoration:none;">📍 View Pinned Location on Map →</a></p>` : ''}
             <hr style="margin:10px 0; border:0; border-top:1px solid #E2E8F0;">
             <p><strong>Details:</strong></p>
-            <ul style="margin-left: 20px; font-size: 0.9rem;">
+            <ul style="margin-left: 20px; font-size: 0.88rem;">
                 ${Object.entries(o.details).map(([k,v]) => `<li>${k}: <strong>${v}</strong></li>`).join('')}
             </ul>
-            <div style="margin-top: 15px; display: flex; gap: 10px;">
-                ${o.status === 'pending' ? `<button class="btn btn-primary" style="flex:1; padding: 5px;" onclick="updateStatus('${o.id}', 'confirmed')">Confirm</button>` : ''}
-                ${o.status === 'confirmed' ? `<button class="btn btn-whatsapp" style="flex:1; padding: 5px;" onclick="updateStatus('${o.id}', 'completed')">Complete</button>` : ''}
-                <button class="btn btn-secondary" style="flex:1; padding: 5px;" onclick="updateStatus('${o.id}', 'cancelled')">Cancel</button>
+            <div style="margin-top: 14px; display: flex; gap: 10px;">
+                ${o.status === 'pending' ? `<button class="btn btn-primary" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${o.id}', 'confirmed')">Confirm</button>` : ''}
+                ${o.status === 'confirmed' ? `<button class="btn btn-whatsapp" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${o.id}', 'completed')">Complete</button>` : ''}
+                ${o.status !== 'completed' && o.status !== 'cancelled' ? `<button class="btn btn-secondary" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${o.id}', 'cancelled')">Cancel</button>` : ''}
             </div>
         </div>
     `).join('');

@@ -34,64 +34,72 @@
         <header class="main-header admin-header">
             <div class="header-container" style="display:flex; justify-content:space-between; align-items:center;">
                 <h1 class="brand-name">GBC <span class="accent-text">DISPATCH</span></h1>
-                <button id="btn-logout" class="btn btn-secondary" style="padding: 5px 10px; font-size:12px;">Logout</button>
+                <button id="btn-logout" class="btn btn-secondary" style="padding: 0.45rem 0.9rem; font-size:0.82rem;">Logout</button>
             </div>
         </header>
 
-        <div class="tab-nav">
-            <button class="tab-btn active" data-target="admin-orders">Live Orders</button>
-            <button class="tab-btn" data-target="admin-settings">Rates & Fleet</button>
-        </div>
-
-        <!-- TAB A: Orders -->
-        <main id="admin-orders" class="tab-content active app-container">
-            <div class="filters">
-                <select id="status-filter">
-                    <option value="All">All</option>
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                </select>
-                <button class="btn btn-secondary" onclick="document.getElementById('block-date-modal').style.display='block'">+ Block Date</button>
+        <main class="app-container">
+            <div class="tab-nav admin-tab-nav">
+                <button class="tab-btn active" data-target="admin-orders">Live Orders</button>
+                <button class="tab-btn" data-target="admin-settings">Rates &amp; Fleet</button>
             </div>
-            
-            <div id="orders-list" class="orders-grid">
-                <!-- Orders injected here -->
-            </div>
-        </main>
 
-        <!-- TAB B: Settings -->
-        <main id="admin-settings" class="tab-content app-container">
-            <h2>System Settings</h2>
-            <form id="settings-form">
-                <h3>Fleet Capacity</h3>
-                <div class="form-group input-row">
-                    <label>Dump Trucks:</label>
-                    <input type="number" id="set-trucks" required>
-                    <label>Backhoes:</label>
-                    <input type="number" id="set-backhoes" required>
+            <!-- TAB A: Orders -->
+            <section id="admin-orders" class="tab-content active">
+                <div class="filters">
+                    <select id="status-filter">
+                        <option value="All">All Orders</option>
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('block-date-modal').style.display='flex'">+ Block Date</button>
                 </div>
-
-                <h3>Service Base Rates (₱)</h3>
-                <div class="form-group">
-                    <label>Hauling (Per Load):</label>
-                    <input type="number" id="set-hauling" required>
-                </div>
-                <div class="form-group">
-                    <label>Backhoe (Daily):</label>
-                    <input type="number" id="set-backhoe-daily" required>
-                </div>
-                <div class="form-group">
-                    <label>Backhoe Add-on (Hauling):</label>
-                    <input type="number" id="set-backhoe-addon" required>
-                </div>
-
-                <h3>Materials (Price per Load)</h3>
-                <div id="materials-settings"></div>
                 
-                <button type="submit" class="btn btn-primary btn-block" style="margin-top:20px;">Save All Settings</button>
-            </form>
+                <div id="orders-list" class="orders-grid">
+                    <!-- Orders injected here -->
+                </div>
+            </section>
+
+            <!-- TAB B: Settings -->
+            <section id="admin-settings" class="tab-content">
+                <h2 style="margin-bottom: 1rem; color: var(--text-dark);">System Settings</h2>
+                <form id="settings-form">
+                    <h3 style="font-size: 1rem; margin: 1rem 0 0.5rem; color: var(--purple-dark);">Fleet Capacity</h3>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label>Dump Trucks</label>
+                            <input type="number" id="set-trucks" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Backhoes</label>
+                            <input type="number" id="set-backhoes" required>
+                        </div>
+                    </div>
+
+                    <h3 style="font-size: 1rem; margin: 0.5rem 0; color: var(--purple-dark);">Service Base Rates (₱)</h3>
+                    <div class="form-group">
+                        <label>Hauling (Per Load)</label>
+                        <input type="number" id="set-hauling" required>
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label>Backhoe (Daily)</label>
+                            <input type="number" id="set-backhoe-daily" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Backhoe Add-on (Hauling)</label>
+                            <input type="number" id="set-backhoe-addon" required>
+                        </div>
+                    </div>
+
+                    <h3 style="font-size: 1rem; margin: 0.5rem 0; color: var(--purple-dark);">Materials (Price per Load)</h3>
+                    <div id="materials-settings"></div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1rem;">Save All Settings</button>
+                </form>
+            </section>
         </main>
     </div>
 
