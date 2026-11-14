@@ -163,11 +163,6 @@ h1, h2, h3, .brand-name {
     text-align: center;
 }
 
-.tab-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: white;
-}
-
 .tab-btn.active {
     background: var(--green-main);
     color: white;

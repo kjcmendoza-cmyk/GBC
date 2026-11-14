@@ -49,10 +49,15 @@ function attachListeners() {
     // Tab Navigation
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+            const targetSection = document.getElementById(btn.dataset.target);
+            if (!targetSection) {
+                console.error('Missing tab section:', btn.dataset.target);
+                return;
+            }
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
-            document.getElementById(btn.dataset.target).classList.add('active');
+            targetSection.classList.add('active');
         });
     });
 
