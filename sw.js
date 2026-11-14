@@ -1,14 +1,14 @@
 // 9. sw.js
-const CACHE_NAME = 'gbc-davao-v1';
+const CACHE_NAME = 'gbc-davao-v2';
 const ASSETS = [
   './',
   './index.html',
   './admin.html',
-  './css/styles.css',
-  './js/app.js',
-  './js/admin.js',
-  './js/davao-data.js',
-  './js/firebase-config.js',
+  './styles.css',
+  './app.js',
+  './admin.js',
+  './davao-data.js',
+  './firebase-config.js',
   './manifest.json'
 ];
 
