@@ -65,22 +65,27 @@ export const DbService = {
         });
         return docRef.id;
     },
-async updateOrderDetails(id, newQty, newTotal) {
-        if (DEMO_MODE) {
-            const orders = JSON.parse(localStorage.getItem('gbc_orders') || '[]');
-            const idx = orders.findIndex(o => o.id === id);
-            if (idx > -1 && orders[idx].details) {
-                orders[idx].details.qty = newQty;
-                orders[idx].details.total = newTotal;
-            }
-            localStorage.setItem('gbc_orders', JSON.stringify(orders));
-            return;
+async updateOrderDetails(id, newQty, newTotal, newMaterial = null) {
+    if (DEMO_MODE) {
+        const orders = JSON.parse(localStorage.getItem('gbc_orders') || '[]');
+        const idx = orders.findIndex(o => o.id === id);
+        if (idx > -1 && orders[idx].details) {
+            orders[idx].details.qty = newQty;
+            orders[idx].details.total = newTotal;
+            if (newMaterial !== null) orders[idx].details.material = newMaterial;
         }
-        await updateDoc(doc(db, "bookings", id), {
-            "details.qty": newQty,
-            "details.total": newTotal
-        });
-    },
+        localStorage.setItem('gbc_orders', JSON.stringify(orders));
+        return;
+    }
+    const updates = {
+        "details.qty": newQty,
+        "details.total": newTotal
+    };
+    if (newMaterial !== null) {
+        updates["details.material"] = newMaterial;
+    }
+    await updateDoc(doc(db, "bookings", id), updates);
+},
 
     async getAvailability() {
         if (DEMO_MODE) {

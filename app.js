@@ -48,13 +48,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function initUI() {
     // Populate Barangays
-    const brgySelects = document.querySelectorAll('.brgy-select');
-    const brgyHTML = appData.barangays
+const brgySelects = document.querySelectorAll('.brgy-select');
+const brgyHTML = `<option value="" data-fee="0" selected disabled>-- Select Barangay / District --</option>` +
+    appData.barangays
         .map(b => `<option value="${b.name}" data-fee="${b.fee}">${b.name}</option>`)
         .join('');
-    brgySelects.forEach(select => {
-        select.innerHTML = brgyHTML;
-    });
+brgySelects.forEach(select => {
+    select.innerHTML = brgyHTML;
+});
 
     // Populate Materials (Tab 1) with individual load steppers
     const matGrid = document.getElementById('material-list');
@@ -771,12 +772,15 @@ function calcHauling() {
     const baseFee = appData.rates.haulingBase * qty;
     const addBackhoe = document.getElementById('hauling-backhoe').checked;
     const backhoeFee = addBackhoe ? appData.rates.backhoeAddon : 0;
-    const locFee = getFee('hauling-brgy');
+    const unitLocFee = getFee('hauling-brgy');
+    const locFee = unitLocFee * qty;
     const total = baseFee + backhoeFee + locFee;
 
     document.getElementById('hauling-fee').innerText = `₱${baseFee.toLocaleString()}`;
     document.getElementById('hauling-backhoe-fee').innerText = `₱${backhoeFee.toLocaleString()}`;
-    document.getElementById('hauling-loc-fee').innerText = `₱${locFee.toLocaleString()}`;
+    document.getElementById('hauling-loc-fee').innerText = unitLocFee > 0 && qty > 1
+        ? `₱${locFee.toLocaleString()} (₱${unitLocFee.toLocaleString()} × ${qty})`
+        : `₱${locFee.toLocaleString()}`;
     document.getElementById('hauling-total').innerText = `₱${total.toLocaleString()}`;
 }
 
@@ -798,6 +802,13 @@ function calcRental() {
 window.prepareCheckout = function (tab) {
     if (tab === 'supply' && getSelectedMaterials().length === 0) {
         alert("Please select at least 1 load of material.");
+        return;
+    }
+
+    const brgySelect = document.getElementById(`${tab}-brgy`);
+    if (!brgySelect?.value) {
+        alert("Please select your Barangay / District (or pin your site on the map).");
+        brgySelect?.focus();
         return;
     }
 
@@ -914,6 +925,33 @@ async function handleCheckoutSubmit(e) {
         if (state.location.mapUrl) summaryText += `\n📍 Map Pin: ${state.location.mapUrl}`;
 
         await DbService.saveOrder(orderData);
+
+        // Hold fleet slot immediately for pending booking
+        try {
+            const start = orderData.details.date;
+            const reserveSlot = (d, resource) => {
+                if (!availability[d]) {
+                    availability[d] = { trucks: 0, backhoes: 0, fullBlockTruck: false, fullBlockBackhoe: false, notes: {} };
+                }
+                availability[d][resource] = (availability[d][resource] || 0) + 1;
+            };
+
+            if (state.checkoutTab === 'supply') {
+                reserveSlot(start, 'trucks');
+            } else if (state.checkoutTab === 'hauling') {
+                reserveSlot(start, 'trucks');
+                if (orderData.details.hasBackhoe) reserveSlot(start, 'backhoes');
+            } else if (state.checkoutTab === 'rental') {
+                const days = Math.max(1, parseInt(orderData.details.days || 1, 10));
+                for (let i = 0; i < days; i++) {
+                    reserveSlot(addDaysToDateStr(start, i), 'backhoes');
+                }
+                if (orderData.details.hasHaul) reserveSlot(start, 'trucks');
+            }
+            await DbService.saveAvailability(availability);
+        } catch (syncErr) {
+            console.warn("Availability hold skipped:", syncErr);
+        }
 
         closeModal('checkout-modal');
         document.getElementById('receipt-ticket').innerText = ticketId;

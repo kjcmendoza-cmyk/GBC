@@ -217,29 +217,31 @@ async function syncFleetAvailability() {
             if (!usage[d]) usage[d] = { trucks: 0, backhoes: 0, fullBlockTruck: false, fullBlockBackhoe: false, notes: {} };
         };
 
-        // Count confirmed orders against fleet capacity
-        allOrders.filter(o => o.status === 'confirmed' && o.details?.date).forEach(o => {
-            const start = o.details.date;
-            if (o.type === 'supply') {
-                ensureDate(start);
-                usage[start].trucks += 1;
-            } else if (o.type === 'hauling') {
-                ensureDate(start);
-                usage[start].trucks += 1;
-                if (o.details.hasBackhoe) usage[start].backhoes += 1;
-            } else if (o.type === 'rental') {
-                const days = Math.max(1, parseInt(o.details.days || 1, 10));
-                for (let i = 0; i < days; i++) {
-                    const dayStr = addDaysToDateStr(start, i);
-                    ensureDate(dayStr);
-                    usage[dayStr].backhoes += 1;
-                }
-                if (o.details.hasHaul) {
-                    ensureDate(start);
-                    usage[start].trucks += 1;
-                }
+        // Count pending & confirmed orders against fleet capacity
+allOrders
+    .filter(o => ['pending', 'confirmed'].includes(o.status) && o.details?.date)
+    .forEach(o => {
+        const start = o.details.date;
+        if (o.type === 'supply') {
+            ensureDate(start);
+            usage[start].trucks += 1;
+        } else if (o.type === 'hauling') {
+            ensureDate(start);
+            usage[start].trucks += 1;
+            if (o.details.hasBackhoe) usage[start].backhoes += 1;
+        } else if (o.type === 'rental') {
+            const days = Math.max(1, parseInt(o.details.days || 1, 10));
+            for (let i = 0; i < days; i++) {
+                const dayStr = addDaysToDateStr(start, i);
+                ensureDate(dayStr);
+                usage[dayStr].backhoes += 1;
             }
-        });
+            if (o.details.hasHaul) {
+                ensureDate(start);
+                usage[start].trucks += 1;
+            }
+        }
+    });
 
         // Apply manual blocks
         blocks.forEach(b => {
@@ -264,15 +266,32 @@ async function syncFleetAvailability() {
 }
 
 window.editOrderQuote = async function(id, currentQty, currentTotal) {
+    const order = cachedOrders.find(o => o.id === id);
+
     const newQtyStr = prompt("Enter verified number of loads:", currentQty || 1);
     if (newQtyStr === null) return;
     const newQty = Math.max(1, parseInt(newQtyStr, 10) || 1);
+
+    let updatedMaterial = null;
+    if (order?.type === 'supply' && order.details?.material) {
+        const currentMat = order.details.material;
+        if (currentMat.includes(',')) {
+            const editedMat = prompt("Update material load breakdown:", currentMat);
+            if (editedMat === null) return;
+            updatedMaterial = editedMat.trim() || currentMat;
+        } else {
+            updatedMaterial = currentMat.replace(
+                /\(\d+\s*loads?\)/i,
+                `(${newQty} load${newQty > 1 ? 's' : ''})`
+            );
+        }
+    }
 
     const newTotal = prompt("Enter updated total estimate (e.g. ₱4,500):", currentTotal || "₱0");
     if (newTotal === null || !newTotal.trim()) return;
 
     try {
-        await DbService.updateOrderDetails(id, newQty, newTotal.trim());
+        await DbService.updateOrderDetails(id, newQty, newTotal.trim(), updatedMaterial);
         await refreshOrders(false);
     } catch (err) {
         alert("Failed to update order: " + err.message);
