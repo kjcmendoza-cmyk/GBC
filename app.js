@@ -545,27 +545,28 @@ document.getElementById('rental-hauling').addEventListener('change', (e) => {
     document.getElementById('calc-wastage').addEventListener('change', runVolumeCalc);
 
     document.getElementById('btn-apply-calc').addEventListener('click', () => {
-        const result = runVolumeCalc();
-        if (!result || result.totalVol <= 0) {
-            alert("Please enter valid dimensions in at least one section first.");
-            return;
-        }
+    const result = runVolumeCalc();
+    if (!result || result.totalVol <= 0) {
+        alert("Please enter valid dimensions in at least one section first.");
+        return;
+    }
 
-        Object.keys(state.materialQtys).forEach(k => { state.materialQtys[k] = 0; });
+    Object.keys(state.materialQtys).forEach(k => { state.materialQtys[k] = 0; });
 
-        if (result.purpose === 'concrete') {
-            if ('sand' in state.materialQtys) state.materialQtys.sand = result.sandLoads;
-            if ('gravel' in state.materialQtys) state.materialQtys.gravel = result.gravelLoads;
-        } else if (result.purpose === 'filling') {
-            if ('escombro' in state.materialQtys) state.materialQtys.escombro = result.loads;
-        } else {
-            if ('gravel' in state.materialQtys) state.materialQtys.gravel = result.loads;
-            else if ('sand' in state.materialQtys) state.materialQtys.sand = result.loads;
-        }
+    if (result.purpose === 'concrete') {
+        if ('sand' in state.materialQtys) state.materialQtys.sand = result.sandLoads;
+        if ('gravel' in state.materialQtys) state.materialQtys.gravel = result.gravelLoads;
+    } else if (result.purpose === 'filling') {
+        if ('escombro' in state.materialQtys) state.materialQtys.escombro = result.loads;
+    } else if (result.purpose === 'gravel') {
+        if ('gravel' in state.materialQtys) state.materialQtys.gravel = result.loads;
+    } else if (result.purpose === 'sand') {
+        if ('sand' in state.materialQtys) state.materialQtys.sand = result.loads;
+    }
 
-        renderMaterialCards();
-        calcSupply();
-    });
+    renderMaterialCards();
+    calcSupply();
+});
 
     // Hauling Photo Compression & Preview
     document.getElementById('hauling-photos').addEventListener('change', async function () {
@@ -720,7 +721,12 @@ function runVolumeCalc() {
 
     const factor = purpose === 'filling' ? 1.25 : 1.10;
     const label = purpose === 'filling' ? 'incl. 25% compaction' : 'incl. 10% leveling';
-    const targetName = purpose === 'filling' ? 'Filling (Escombro)' : 'Crushed Gravel';
+    const targetLabels = {
+        filling: 'Filling (Escombro)',
+        gravel: 'Crushed Gravel',
+        sand: 'Washed Sand'
+    };
+    const targetName = targetLabels[purpose] || 'Crushed Gravel';
     const reqVol = rawVol * factor;
     const loads = Math.max(1, Math.ceil(reqVol / 2.8));
 
