@@ -89,11 +89,6 @@ brgySelects.forEach(select => {
     });
 
     // Allow flexible PH phone formats (+639..., spaces, dashes) before JS normalization
-    const phoneInput = document.getElementById('cust-phone');
-    if (phoneInput) {
-        phoneInput.removeAttribute('pattern');
-        phoneInput.placeholder = '0917 123 4567 or +639171234567';
-    }
 
     calcSupply();
     calcHauling();
@@ -178,7 +173,14 @@ function validateAllDates() {
     validateTabDate('hauling');
     validateTabDate('rental');
 }
-
+async function refreshLiveAvailability() {
+    const [latestBlocks, latestAvail] = await Promise.all([
+        DbService.getBlockedDates().catch(() => blockedDates),
+        DbService.getAvailability().catch(() => availability)
+    ]);
+    blockedDates = latestBlocks;
+    availability = latestAvail;
+}
 function initMapPicker() {
     if (typeof L === 'undefined') return;
 
@@ -799,7 +801,7 @@ function calcRental() {
     document.getElementById('rental-total').innerText = `₱${total.toLocaleString()}`;
 }
 
-window.prepareCheckout = function (tab) {
+window.prepareCheckout = async function (tab) {
     if (tab === 'supply' && getSelectedMaterials().length === 0) {
         alert("Please select at least 1 load of material.");
         return;
@@ -811,6 +813,8 @@ window.prepareCheckout = function (tab) {
         brgySelect?.focus();
         return;
     }
+
+    await refreshLiveAvailability();
 
     const conflict = validateTabDate(tab);
     if (conflict) {
@@ -848,6 +852,15 @@ async function handleCheckoutSubmit(e) {
     btn.innerText = "Processing...";
 
     try {
+        await refreshLiveAvailability();
+        const conflict = validateTabDate(state.checkoutTab);
+        if (conflict) {
+            const resName = conflict.resource === 'backhoe' ? 'PC30 Backhoe' : 'Dump Truck';
+            closeModal('checkout-modal');
+            alert(`Sorry, the ${resName} was just booked for ${conflict.date}. Please choose another date.`);
+            return;
+        }
+
         const ticketId = 'GBC-' + Math.floor(100000 + Math.random() * 900000);
         const cust = {
             name: document.getElementById('cust-name').value.trim(),

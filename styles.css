@@ -246,11 +246,15 @@ h1, h2, h3, .brand-name {
 
 .mat-card {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.75rem;
     border: 2px solid var(--border);
     border-radius: 12px;
     padding: 1rem;
     text-align: left;
-    cursor: pointer;
+    cursor: default;
     transition: all 0.2s ease;
     background: white;
 }
@@ -267,10 +271,16 @@ h1, h2, h3, .brand-name {
     box-shadow: 0 6px 16px -4px rgba(5, 150, 105, 0.18);
 }
 
+.mat-card-top {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
 .mat-card h4 {
     color: var(--text-dark);
     font-size: 0.98rem;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0;
 }
 
 .mat-card p {
@@ -281,6 +291,45 @@ h1, h2, h3, .brand-name {
 
 .mat-card.selected p {
     color: var(--green-hover);
+}
+
+.mat-card-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #F8FAFC;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.mat-card.selected .mat-card-stepper {
+    background: white;
+    border-color: var(--green-border);
+}
+
+.mat-card-stepper button {
+    background: var(--purple-soft);
+    border: none;
+    width: 38px;
+    height: 34px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--purple-dark);
+    cursor: pointer;
+    transition: 0.15s;
+}
+
+.mat-card-stepper button:hover {
+    background: var(--green-main);
+    color: white;
+}
+
+.mat-card-stepper span {
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--text-dark);
 }
 
 /* Form Elements */
@@ -837,14 +886,14 @@ input:focus, select:focus, textarea:focus {
         line-height: 1.15;
     }
 
-    /* Compact Horizontal Material Cards on Mobile */
+   /* Compact Horizontal Material Cards on Mobile */
     .material-grid {
         grid-template-columns: 1fr;
         gap: 0.55rem;
     }
 
     .mat-card {
-        display: flex;
+        flex-direction: row;
         align-items: center;
         justify-content: space-between;
         padding: 0.85rem 0.95rem;
@@ -852,14 +901,17 @@ input:focus, select:focus, textarea:focus {
     }
 
     .mat-card h4 {
-        margin-bottom: 0;
         font-size: 0.92rem;
     }
 
     .mat-card p {
-        padding-left: 0;
         font-size: 0.88rem;
         white-space: nowrap;
+    }
+
+    .mat-card-stepper {
+        width: 122px;
+        flex-shrink: 0;
     }
 
     /* Stack Stepper Controls Below Labels so Text Never Squishes */
@@ -1104,58 +1156,6 @@ input:focus, select:focus, textarea:focus {
 /* =========================================
    MULTI-MATERIAL CARDS & MULTI-SECTION CALC
    ========================================= */
-.mat-card {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 0.75rem;
-    cursor: default;
-}
-
-.mat-card-top {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.mat-card-stepper {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #F8FAFC;
-    border: 1.5px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    width: 100%;
-}
-
-.mat-card.selected .mat-card-stepper {
-    background: white;
-    border-color: var(--green-border);
-}
-
-.mat-card-stepper button {
-    background: var(--purple-soft);
-    border: none;
-    width: 38px;
-    height: 34px;
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: var(--purple-dark);
-    cursor: pointer;
-    transition: 0.15s;
-}
-
-.mat-card-stepper button:hover {
-    background: var(--green-main);
-    color: white;
-}
-
-.mat-card-stepper span {
-    font-weight: 800;
-    font-size: 0.9rem;
-    color: var(--text-dark);
-}
 
 .calc-section-card {
     background: #FAFAFF;
@@ -1231,15 +1231,6 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 560px) {
-    .mat-card {
-        flex-direction: row;
-        align-items: center;
-    }
-
-    .mat-card-stepper {
-        width: 122px;
-        flex-shrink: 0;
-    }
 
     .calc-section-grid {
         grid-template-columns: 1fr 1fr;

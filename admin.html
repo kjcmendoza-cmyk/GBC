@@ -117,7 +117,7 @@
         </main>
     </div>
 
-    <!-- Manual Block Modal -->
+        <!-- Manual Block Modal -->
     <div id="block-date-modal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('block-date-modal')">&times;</span>
@@ -149,7 +149,29 @@
             </form>
         </div>
     </div>
-
+<!-- Edit Quote Modal -->
+    <div id="edit-quote-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('edit-quote-modal')">&times;</span>
+            <h2>Edit Verified Quote</h2>
+            <form id="edit-quote-form">
+                <input type="hidden" id="edit-order-id">
+                <div class="form-group">
+                    <label for="edit-order-qty">Verified Number of Loads:</label>
+                    <input type="number" id="edit-order-qty" min="1" required>
+                </div>
+                <div class="form-group" id="edit-material-group">
+                    <label for="edit-order-material">Material Load Breakdown:</label>
+                    <input type="text" id="edit-order-material" placeholder="e.g., Washed Sand (2 loads)">
+                </div>
+                <div class="form-group">
+                    <label for="edit-order-total">Updated Total Estimate:</label>
+                    <input type="text" id="edit-order-total" placeholder="e.g., ₱4,500" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Save Updated Quote</button>
+            </form>
+        </div>
+    </div>
     <script type="module" src="admin.js"></script>
 </body>
 </html>

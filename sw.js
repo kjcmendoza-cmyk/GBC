@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gbc-davao-v13';
+const CACHE_NAME = 'gbc-davao-v15';
 const ASSETS = [
   './',
   './index.html',

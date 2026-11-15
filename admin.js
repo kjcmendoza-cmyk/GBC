@@ -131,6 +131,36 @@ async function showDashboard() {
         }
     });
 
+    // Edit Quote Submit
+    document.getElementById('edit-quote-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.innerText = "Saving...";
+
+        try {
+            const id = document.getElementById('edit-order-id').value;
+            const order = cachedOrders.find(o => o.id === id);
+            const newQty = Math.max(1, parseInt(document.getElementById('edit-order-qty').value, 10) || 1);
+            const newTotal = document.getElementById('edit-order-total').value.trim();
+
+            let updatedMaterial = null;
+            if (order?.type === 'supply') {
+                const matVal = document.getElementById('edit-order-material').value.trim();
+                updatedMaterial = matVal || order.details?.material || null;
+            }
+
+            await DbService.updateOrderDetails(id, newQty, newTotal, updatedMaterial);
+            closeModal('edit-quote-modal');
+            await refreshOrders(false);
+        } catch (err) {
+            alert("Failed to update order: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Save Updated Quote";
+        }
+    });
+
     // Settings Submit
     document.getElementById('settings-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -265,37 +295,23 @@ allOrders
     }
 }
 
-window.editOrderQuote = async function(id, currentQty, currentTotal) {
+window.editOrderQuote = function(id, currentQty, currentTotal) {
     const order = cachedOrders.find(o => o.id === id);
+    document.getElementById('edit-order-id').value = id;
+    document.getElementById('edit-order-qty').value = currentQty || 1;
+    document.getElementById('edit-order-total').value = currentTotal || '₱0';
 
-    const newQtyStr = prompt("Enter verified number of loads:", currentQty || 1);
-    if (newQtyStr === null) return;
-    const newQty = Math.max(1, parseInt(newQtyStr, 10) || 1);
-
-    let updatedMaterial = null;
+    const matGroup = document.getElementById('edit-material-group');
+    const matInput = document.getElementById('edit-order-material');
     if (order?.type === 'supply' && order.details?.material) {
-        const currentMat = order.details.material;
-        if (currentMat.includes(',')) {
-            const editedMat = prompt("Update material load breakdown:", currentMat);
-            if (editedMat === null) return;
-            updatedMaterial = editedMat.trim() || currentMat;
-        } else {
-            updatedMaterial = currentMat.replace(
-                /\(\d+\s*loads?\)/i,
-                `(${newQty} load${newQty > 1 ? 's' : ''})`
-            );
-        }
+        matGroup.style.display = 'block';
+        matInput.value = order.details.material;
+    } else {
+        matGroup.style.display = 'none';
+        matInput.value = '';
     }
 
-    const newTotal = prompt("Enter updated total estimate (e.g. ₱4,500):", currentTotal || "₱0");
-    if (newTotal === null || !newTotal.trim()) return;
-
-    try {
-        await DbService.updateOrderDetails(id, newQty, newTotal.trim(), updatedMaterial);
-        await refreshOrders(false);
-    } catch (err) {
-        alert("Failed to update order: " + err.message);
-    }
+    document.getElementById('edit-quote-modal').style.display = 'flex';
 };
 
 async function refreshOrders(shouldSyncAvailability = false) {
