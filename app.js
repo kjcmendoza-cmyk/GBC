@@ -68,6 +68,7 @@ function initUI() {
             </div>
         `).join('');
         state.selectedMaterial = availableMaterials[0];
+        syncCalculatorWithMaterial(state.selectedMaterial.id);
     }
 
     // Initialize Dates to tomorrow & prevent selecting past dates
@@ -362,6 +363,8 @@ function attachListeners() {
             name: card.dataset.name,
             price: parseFloat(card.dataset.price)
         };
+        syncCalculatorWithMaterial(state.selectedMaterial.id);
+        runVolumeCalc();
         calcSupply();
     });
 
@@ -413,55 +416,6 @@ function attachListeners() {
     });
 
     // Volume Calculator
-    const toMeters = (val, unit) => {
-        if (unit === 'ft') return val * 0.3048;
-        if (unit === 'in') return val * 0.0254;
-        if (unit === 'cm') return val * 0.01;
-        return val;
-    };
-
-    const runVolumeCalc = () => {
-        const lRaw = parseFloat(document.getElementById('calc-l').value || 0);
-        const wRaw = parseFloat(document.getElementById('calc-w').value || 0);
-        const dRaw = parseFloat(document.getElementById('calc-d').value || 0);
-
-        const l = toMeters(lRaw, document.getElementById('calc-l-unit').value);
-        const w = toMeters(wRaw, document.getElementById('calc-w-unit').value);
-        const d = toMeters(dRaw, document.getElementById('calc-d-unit').value);
-
-        const purpose = document.getElementById('calc-purpose').value;
-        const breakdown = document.getElementById('calc-breakdown');
-
-        if (!l || !w || !d) {
-            breakdown.innerHTML = 'Enter dimensions above to estimate loads.';
-            return 1;
-        }
-
-        const rawVol = l * w * d;
-
-        if (purpose === 'concrete') {
-            const sandVol = rawVol * 0.50;
-            const gravelVol = rawVol * 1.00;
-            const sandLoads = Math.max(1, Math.ceil(sandVol / 2.8));
-            const gravelLoads = Math.max(1, Math.ceil(gravelVol / 2.8));
-
-            breakdown.innerHTML = `
-                Total Concrete: <strong>${rawVol.toFixed(2)} cu.m.</strong><br>
-                • Washed Sand: <strong>${sandVol.toFixed(2)} cu.m.</strong> (${sandLoads} load${sandLoads > 1 ? 's' : ''})<br>
-                • Crushed Gravel: <strong>${gravelVol.toFixed(2)} cu.m.</strong> (${gravelLoads} load${gravelLoads > 1 ? 's' : ''})
-            `;
-            return state.selectedMaterial?.id === 'sand' ? sandLoads : gravelLoads;
-        }
-
-        const factor = purpose === 'filling' ? 1.15 : 1.05;
-        const label = purpose === 'filling' ? 'incl. 15% compaction' : 'incl. 5% leveling';
-        const reqVol = rawVol * factor;
-        const loads = Math.max(1, Math.ceil(reqVol / 2.8));
-
-        breakdown.innerHTML = `Required (${label}): <strong>${reqVol.toFixed(2)} cu.m.</strong> (<strong>${loads} load${loads > 1 ? 's' : ''}</strong>)`;
-        return loads;
-    };
-
     ['calc-l', 'calc-w', 'calc-d', 'calc-l-unit', 'calc-w-unit', 'calc-d-unit', 'calc-purpose'].forEach(id => {
         const el = document.getElementById(id);
         el.addEventListener('input', runVolumeCalc);
@@ -469,6 +423,15 @@ function attachListeners() {
     });
 
     document.getElementById('btn-apply-calc').addEventListener('click', () => {
+        const purpose = document.getElementById('calc-purpose').value;
+        if (purpose === 'filling' && state.selectedMaterial?.id !== 'escombro') {
+            const escombroCard = document.querySelector('.mat-card[data-id="escombro"]');
+            if (escombroCard) escombroCard.click();
+        } else if (purpose === 'concrete' && state.selectedMaterial?.id === 'escombro') {
+            const gravelCard = document.querySelector('.mat-card[data-id="gravel"]');
+            if (gravelCard) gravelCard.click();
+        }
+
         const loads = runVolumeCalc();
         document.getElementById('supply-qty').value = loads;
         calcSupply();
@@ -497,6 +460,73 @@ function attachListeners() {
 
     // Checkout Form Submit
     document.getElementById('checkout-form').addEventListener('submit', handleCheckoutSubmit);
+}
+
+function toMeters(val, unit) {
+    if (unit === 'ft') return val * 0.3048;
+    if (unit === 'in') return val * 0.0254;
+    if (unit === 'cm') return val * 0.01;
+    return val;
+}
+
+function syncCalculatorWithMaterial(matId) {
+    const purposeEl = document.getElementById('calc-purpose');
+    if (!purposeEl) return;
+
+    if (matId === 'escombro') {
+        purposeEl.value = 'filling';
+    } else if (purposeEl.value === 'filling') {
+        purposeEl.value = 'concrete';
+    }
+}
+
+function runVolumeCalc() {
+    const lRaw = parseFloat(document.getElementById('calc-l').value || 0);
+    const wRaw = parseFloat(document.getElementById('calc-w').value || 0);
+    const dRaw = parseFloat(document.getElementById('calc-d').value || 0);
+
+    const l = toMeters(lRaw, document.getElementById('calc-l-unit').value);
+    const w = toMeters(wRaw, document.getElementById('calc-w-unit').value);
+    const d = toMeters(dRaw, document.getElementById('calc-d-unit').value);
+
+    const purpose = document.getElementById('calc-purpose').value;
+    const breakdown = document.getElementById('calc-breakdown');
+
+    if (!l || !w || !d) {
+        breakdown.innerHTML = 'Enter dimensions above to estimate loads.';
+        return 1;
+    }
+
+    const rawVol = l * w * d;
+
+    if (purpose === 'concrete') {
+        const sandVol = rawVol * 0.50;
+        const gravelVol = rawVol * 1.00;
+        const sandLoads = Math.max(1, Math.ceil(sandVol / 2.8));
+        const gravelLoads = Math.max(1, Math.ceil(gravelVol / 2.8));
+
+        const isSand = state.selectedMaterial?.id === 'sand';
+        const targetLoads = isSand ? sandLoads : gravelLoads;
+        const targetLabel = isSand ? 'Washed Sand' : 'Crushed Gravel';
+
+        breakdown.innerHTML = `
+            Total Concrete: <strong>${rawVol.toFixed(2)} cu.m.</strong><br>
+            • Washed Sand: <strong>${sandVol.toFixed(2)} cu.m.</strong> (${sandLoads} load${sandLoads > 1 ? 's' : ''})<br>
+            • Crushed Gravel: <strong>${gravelVol.toFixed(2)} cu.m.</strong> (${gravelLoads} load${gravelLoads > 1 ? 's' : ''})<br>
+            <span style="display:inline-block; margin-top:4px; color:var(--purple-dark);">
+                ↳ <strong>Apply</strong> sets <strong>${targetLoads} load${targetLoads > 1 ? 's' : ''}</strong> of <strong>${targetLabel}</strong> (order the other aggregate separately or add a note).
+            </span>
+        `;
+        return targetLoads;
+    }
+
+    const factor = purpose === 'filling' ? 1.25 : 1.10;
+    const label = purpose === 'filling' ? 'incl. 25% compaction' : 'incl. 10% leveling';
+    const reqVol = rawVol * factor;
+    const loads = Math.max(1, Math.ceil(reqVol / 2.8));
+
+    breakdown.innerHTML = `Required (${label}): <strong>${reqVol.toFixed(2)} cu.m.</strong> (<strong>${loads} load${loads > 1 ? 's' : ''}</strong>)`;
+    return loads;
 }
 
 function getFee(selectId) {

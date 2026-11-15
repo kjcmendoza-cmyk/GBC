@@ -122,64 +122,68 @@
                     <span class="chevron">▾</span>
                 </summary>
                 <div class="helper-content">
-    <p class="helper-hint">Select your project type and dimensions (supports m, ft, in, cm):</p>
+                    <p class="helper-hint">Select your project type and dimensions (supports m, ft, in, cm):</p>
 
-    <div class="form-group" style="margin-bottom: 0.65rem;">
-        <select id="calc-purpose">
-            <option value="concrete">Concrete Pour (1:2:4 Mix — Slab / Footing / Wall)</option>
-            <option value="filling">Lot Filling / Backfill (Escombro +15% Compaction)</option>
-            <option value="bedding">Gravel Driveway / Sand Bedding (+5% Leveling)</option>
-        </select>
-    </div>
+                    <div class="form-group" style="margin-bottom: 0.65rem;">
+                        <select id="calc-purpose">
+                            <option value="concrete">Concrete Pour (1:2:4 Mix — Slab / Footing / Wall)</option>
+                            <option value="filling">Lot Filling / Backfill (Escombro +25% Compaction)</option>
+                            <option value="bedding">Gravel Driveway / Sand Bedding (+10% Leveling)</option>
+                        </select>
+                    </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;">
-        <div>
-            <small style="display:block; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Length</small>
-            <div style="display:flex; gap:4px;">
-                <input type="number" id="calc-l" placeholder="0" step="0.01" min="0">
-                <select id="calc-l-unit" style="width:68px; padding:0.5rem 0.35rem;">
-                    <option value="m" selected>m</option>
-                    <option value="ft">ft</option>
-                    <option value="in">in</option>
-                    <option value="cm">cm</option>
-                </select>
-            </div>
-        </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div>
+                            <small style="display:block; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Length</small>
+                            <div style="display:flex; gap:4px;">
+                                <input type="number" id="calc-l" placeholder="0" step="0.01" min="0">
+                                <select id="calc-l-unit" style="width:68px; padding:0.5rem 0.35rem;">
+                                    <option value="m" selected>m</option>
+                                    <option value="ft">ft</option>
+                                    <option value="in">in</option>
+                                    <option value="cm">cm</option>
+                                </select>
+                            </div>
+                        </div>
 
-        <div>
-            <small style="display:block; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Width</small>
-            <div style="display:flex; gap:4px;">
-                <input type="number" id="calc-w" placeholder="0" step="0.01" min="0">
-                <select id="calc-w-unit" style="width:68px; padding:0.5rem 0.35rem;">
-                    <option value="m" selected>m</option>
-                    <option value="ft">ft</option>
-                    <option value="in">in</option>
-                    <option value="cm">cm</option>
-                </select>
-            </div>
-        </div>
+                        <div>
+                            <small style="display:block; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Width</small>
+                            <div style="display:flex; gap:4px;">
+                                <input type="number" id="calc-w" placeholder="0" step="0.01" min="0">
+                                <select id="calc-w-unit" style="width:68px; padding:0.5rem 0.35rem;">
+                                    <option value="m" selected>m</option>
+                                    <option value="ft">ft</option>
+                                    <option value="in">in</option>
+                                    <option value="cm">cm</option>
+                                </select>
+                            </div>
+                        </div>
 
-        <div>
-            <small style="display:block; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Depth / Thickness</small>
-            <div style="display:flex; gap:4px;">
-                <input type="number" id="calc-d" placeholder="0" step="0.01" min="0">
-                <select id="calc-d-unit" style="width:68px; padding:0.5rem 0.35rem;">
-                    <option value="in" selected>in</option>
-                    <option value="m">m</option>
-                    <option value="ft">ft</option>
-                    <option value="cm">cm</option>
-                </select>
-            </div>
-        </div>
-    </div>
+                        <div>
+                            <small style="display:block; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Depth / Thickness</small>
+                            <div style="display:flex; gap:4px;">
+                                <input type="number" id="calc-d" placeholder="0" step="0.01" min="0">
+                                <select id="calc-d-unit" style="width:68px; padding:0.5rem 0.35rem;">
+                                    <option value="in" selected>in</option>
+                                    <option value="m">m</option>
+                                    <option value="ft">ft</option>
+                                    <option value="cm">cm</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
 
-    <div class="calc-footer">
-        <div id="calc-breakdown" style="font-size:0.84rem; line-height:1.45;">
-            Enter dimensions above to estimate loads.
-        </div>
-        <button type="button" id="btn-apply-calc" class="btn btn-purple-outline">Apply to Order</button>
-    </div>
-</div>
+                    <div class="calc-footer">
+                        <div id="calc-breakdown" style="font-size:0.84rem; line-height:1.45;">
+                            Enter dimensions above to estimate loads.
+                        </div>
+                        <button type="button" id="btn-apply-calc" class="btn btn-purple-outline">Apply to Order</button>
+                    </div>
+
+                    <small style="display:block; margin-top:0.65rem; padding-top:0.55rem; border-top:1px dashed var(--purple-border); color:var(--text-muted); font-size:0.76rem; line-height:1.4;">
+                        *Ballpark guide only (~2.8 cu.m./load). Actual loads vary with ground slope, moisture, and compaction—please confirm with your mason or foreman before ordering.
+                    </small>
+                </div>
             </details>
             <div class="map-slot">
     <div id="map-picker-wrapper" class="map-picker-card">
