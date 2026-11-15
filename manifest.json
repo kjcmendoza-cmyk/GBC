@@ -1,19 +1,19 @@
 {
-  "name": "GBC Sand & Gravel",
+  "name": "GBC Sand, Gravel & Hauling Davao",
   "short_name": "GBC Davao",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#F8FAFC",
-  "theme_color": "#0F172A",
-  "description": "Order Sand, Gravel, and Equipment Rentals in Davao City",
+  "background_color": "#F5F3FF",
+  "theme_color": "#2E1065",
+  "description": "Order Sand, Gravel, Hauling, and Mini Backhoe Rentals in Davao City",
   "icons": [
     {
-      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiBmaWxsPSIjMEYxNzJBIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIvPjwvc3ZnPg==",
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='36' fill='%232E1065'/><text x='50%25' y='56%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-weight='800' font-size='64' fill='%2334D399'>GBC</text></svg>",
       "sizes": "192x192",
       "type": "image/svg+xml"
     },
     {
-      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSIjMEYxNzJBIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIvPjwvc3ZnPg==",
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='96' fill='%232E1065'/><text x='50%25' y='56%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-weight='800' font-size='170' fill='%2334D399'>GBC</text></svg>",
       "sizes": "512x512",
       "type": "image/svg+xml"
     }

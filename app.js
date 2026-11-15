@@ -1,11 +1,16 @@
 import { getAppData } from './davao-data.js';
 import { DbService } from './firebase-config.js';
 
+// Optional: Put your Facebook Page username here (e.g., 'gbcdavao') so Messenger opens your page directly
+const MESSENGER_USERNAME = '';
+
 let appData;
+let blockedDates = [];
 let map, marker;
 let state = {
     selectedMaterial: null,
     checkoutTab: null,
+    haulingPhotoBlobs: [],
     location: {
         lat: 7.0731,
         lng: 125.6128,
@@ -14,42 +19,132 @@ let state = {
     }
 };
 
+function getLocalTodayStr() {
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime() - offset).toISOString().split('T')[0];
+}
+
+function getLocalTomorrowStr() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const offset = tomorrow.getTimezoneOffset() * 60000;
+    return new Date(tomorrow.getTime() - offset).toISOString().split('T')[0];
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
-    appData = await getAppData();
+    [appData, blockedDates] = await Promise.all([
+        getAppData(),
+        DbService.getBlockedDates().catch(() => [])
+    ]);
+
     initUI();
     initMapPicker();
     attachListeners();
+    validateAllDates();
 });
 
 function initUI() {
     // Populate Barangays
     const brgySelects = document.querySelectorAll('.brgy-select');
-    let brgyHTML = appData.barangays.map(b => `<option value="${b.name}" data-fee="${b.fee}">${b.name}</option>`).join('');
+    const brgyHTML = appData.barangays
+        .map(b => `<option value="${b.name}" data-fee="${b.fee}">${b.name}</option>`)
+        .join('');
     brgySelects.forEach(select => {
         select.innerHTML = brgyHTML;
     });
 
     // Populate Materials (Tab 1)
     const matGrid = document.getElementById('material-list');
-    matGrid.innerHTML = appData.materials.filter(m => m.inStock).map((m, i) => `
-        <div class="mat-card ${i===0?'selected':''}" data-id="${m.id}" data-price="${m.price}" data-name="${m.name}">
-            <h4>${m.name}</h4>
-            <p>₱${m.price.toLocaleString()}/load</p>
-        </div>
-    `).join('');
-    state.selectedMaterial = appData.materials.filter(m => m.inStock)[0];
+    const availableMaterials = appData.materials.filter(m => m.inStock);
 
-    // Initialize Dates to tomorrow
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = tomorrow.toISOString().split('T')[0];
-    document.getElementById('supply-date').value = dateStr;
-    document.getElementById('hauling-date').value = dateStr;
-    document.getElementById('rental-date').value = dateStr;
+    if (availableMaterials.length === 0) {
+        matGrid.innerHTML = `<p class="sub-text">All materials are currently out of stock. Please call dispatch for updates.</p>`;
+    } else {
+        matGrid.innerHTML = availableMaterials.map((m, i) => `
+            <div class="mat-card ${i === 0 ? 'selected' : ''}" data-id="${m.id}" data-price="${m.price}" data-name="${m.name}">
+                <h4>${m.name}</h4>
+                <p>₱${m.price.toLocaleString()}/load</p>
+            </div>
+        `).join('');
+        state.selectedMaterial = availableMaterials[0];
+    }
+
+    // Initialize Dates to tomorrow & prevent selecting past dates
+    const todayStr = getLocalTodayStr();
+    const tomorrowStr = getLocalTomorrowStr();
+
+    ['supply-date', 'hauling-date', 'rental-date'].forEach(id => {
+        const input = document.getElementById(id);
+        input.min = todayStr;
+        input.value = tomorrowStr;
+
+        const warnEl = document.createElement('small');
+        warnEl.id = `${id}-warning`;
+        warnEl.style.display = 'none';
+        warnEl.style.color = '#B91C1C';
+        warnEl.style.fontWeight = '600';
+        warnEl.style.marginTop = '0.3rem';
+        input.parentElement.appendChild(warnEl);
+    });
+
+    // Allow flexible PH phone formats (+639..., spaces, dashes) before JS normalization
+    const phoneInput = document.getElementById('cust-phone');
+    if (phoneInput) {
+        phoneInput.removeAttribute('pattern');
+        phoneInput.placeholder = '0917 123 4567 or +639171234567';
+    }
 
     calcSupply();
     calcHauling();
     calcRental();
+}
+
+function getBlockedConflict(tab) {
+    const dateInput = document.getElementById(`${tab}-date`);
+    const selectedDate = dateInput?.value;
+    if (!selectedDate) return null;
+
+    const neededResources = [];
+    if (tab === 'supply') {
+        neededResources.push('truck');
+    } else if (tab === 'hauling') {
+        neededResources.push('truck');
+        if (document.getElementById('hauling-backhoe').checked) {
+            neededResources.push('backhoe');
+        }
+    } else if (tab === 'rental') {
+        neededResources.push('backhoe');
+        if (document.getElementById('rental-hauling').checked) {
+            neededResources.push('truck');
+        }
+    }
+
+    return blockedDates.find(
+        b => b.date === selectedDate && neededResources.includes(b.resource)
+    ) || null;
+}
+
+function validateTabDate(tab) {
+    const warnEl = document.getElementById(`${tab}-date-warning`);
+    if (!warnEl) return null;
+
+    const conflict = getBlockedConflict(tab);
+    if (conflict) {
+        const resName = conflict.resource === 'backhoe' ? 'PC30 Backhoe' : 'Dump Truck';
+        const reason = conflict.notes ? ` (${conflict.notes})` : '';
+        warnEl.innerText = `⚠️ ${resName} is unavailable on ${conflict.date}${reason}. Please choose another date.`;
+        warnEl.style.display = 'block';
+    } else {
+        warnEl.style.display = 'none';
+    }
+    return conflict;
+}
+
+function validateAllDates() {
+    validateTabDate('supply');
+    validateTabDate('hauling');
+    validateTabDate('rental');
 }
 
 function initMapPicker() {
@@ -65,19 +160,16 @@ function initMapPicker() {
 
     marker = L.marker(davaoCenter, { draggable: true }).addTo(map);
 
-    // Drag pin
     marker.on('dragend', () => {
         const pos = marker.getLatLng();
         updatePinnedLocation(pos.lat, pos.lng, true);
     });
 
-    // Tap anywhere on map
     map.on('click', (e) => {
         marker.setLatLng(e.latlng);
         updatePinnedLocation(e.latlng.lat, e.latlng.lng, true);
     });
 
-    // GPS Button
     document.getElementById('btn-use-gps').addEventListener('click', () => {
         if (!navigator.geolocation) {
             alert("Geolocation is not supported by your browser.");
@@ -99,7 +191,6 @@ function initMapPicker() {
         );
     });
 
-    // Address Search Autocomplete (Biased to Davao City)
     const searchInput = document.getElementById('map-search-input');
     const resultsList = document.getElementById('map-search-results');
     let debounceTimer;
@@ -147,7 +238,6 @@ function initMapPicker() {
         }, 350);
     });
 
-    // Hide search results when clicking outside
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.map-search-wrap')) {
             resultsList.style.display = 'none';
@@ -174,7 +264,6 @@ async function updatePinnedLocation(lat, lng, reverseLookup = true, presetAddres
     state.location = { lat, lng, address: resolvedAddress, mapUrl };
     label.innerHTML = `<strong>Pinned:</strong> ${resolvedAddress}`;
 
-    // Pre-fill checkout address box & sync district fee
     const custAddressEl = document.getElementById('cust-address');
     if (custAddressEl) custAddressEl.value = resolvedAddress;
 
@@ -201,15 +290,53 @@ function autoMatchBarangayFee(addressText) {
     calcRental();
 }
 
+function compressImage(file, maxDimension = 1200, quality = 0.75) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+
+        img.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            let { width, height } = img;
+            if (width > maxDimension || height > maxDimension) {
+                if (width > height) {
+                    height = Math.round((height * maxDimension) / width);
+                    width = maxDimension;
+                } else {
+                    width = Math.round((width * maxDimension) / height);
+                    height = maxDimension;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob(
+                (blob) => (blob ? resolve(blob) : reject(new Error('Image compression failed'))),
+                'image/jpeg',
+                quality
+            );
+        };
+
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('Invalid image file'));
+        };
+
+        img.src = objectUrl;
+    });
+}
+
 function attachListeners() {
     // Tab Navigation + Move Map Widget to Active Tab
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const targetSection = document.getElementById(btn.dataset.target);
-            if (!targetSection) {
-                console.error('Missing tab section:', btn.dataset.target);
-                return;
-            }
+            if (!targetSection) return;
+
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
@@ -241,12 +368,20 @@ function attachListeners() {
     // Steppers
     const bindStepper = (minusId, plusId, inputId, callback) => {
         document.getElementById(minusId).addEventListener('click', () => {
-            let v = parseInt(document.getElementById(inputId).value);
-            if (v > 1) { document.getElementById(inputId).value = v - 1; callback(); }
+            const v = parseInt(document.getElementById(inputId).value, 10);
+            if (v > 1) {
+                document.getElementById(inputId).value = v - 1;
+                callback();
+            }
         });
         document.getElementById(plusId).addEventListener('click', () => {
-            let v = parseInt(document.getElementById(inputId).value);
-            document.getElementById(inputId).value = v + 1; callback();
+            const input = document.getElementById(inputId);
+            const v = parseInt(input.value, 10);
+            const max = input.max ? parseInt(input.max, 10) : Infinity;
+            if (v < max) {
+                input.value = v + 1;
+                callback();
+            }
         });
     };
     bindStepper('supply-minus', 'supply-plus', 'supply-qty', calcSupply);
@@ -254,13 +389,19 @@ function attachListeners() {
     bindStepper('rental-minus', 'rental-plus', 'rental-qty', calcRental);
     bindStepper('rental-haul-minus', 'rental-haul-plus', 'rental-haul-qty', calcRental);
 
+    // Date change validation
+    document.getElementById('supply-date').addEventListener('change', () => validateTabDate('supply'));
+    document.getElementById('hauling-date').addEventListener('change', () => validateTabDate('hauling'));
+    document.getElementById('rental-date').addEventListener('change', () => validateTabDate('rental'));
+
     // Dynamic Selects & Checkboxes
     document.getElementById('supply-brgy').addEventListener('change', calcSupply);
-    
+
     document.getElementById('hauling-brgy').addEventListener('change', calcHauling);
     document.getElementById('hauling-backhoe').addEventListener('change', (e) => {
         document.getElementById('hauling-backhoe-row').style.display = e.target.checked ? 'flex' : 'none';
         calcHauling();
+        validateTabDate('hauling');
     });
 
     document.getElementById('rental-brgy').addEventListener('change', calcRental);
@@ -268,9 +409,10 @@ function attachListeners() {
         document.getElementById('rental-hauling-options').style.display = e.target.checked ? 'flex' : 'none';
         document.getElementById('rental-haul-row').style.display = e.target.checked ? 'flex' : 'none';
         calcRental();
+        validateTabDate('rental');
     });
 
-    // Volume Calculator (Multi-Unit & Construction Mix Ratios)
+    // Volume Calculator
     const toMeters = (val, unit) => {
         if (unit === 'ft') return val * 0.3048;
         if (unit === 'in') return val * 0.0254;
@@ -298,7 +440,6 @@ function attachListeners() {
         const rawVol = l * w * d;
 
         if (purpose === 'concrete') {
-            // Standard PH Class A (1:2:4) concrete mix estimating factors
             const sandVol = rawVol * 0.50;
             const gravelVol = rawVol * 1.00;
             const sandLoads = Math.max(1, Math.ceil(sandVol / 2.8));
@@ -333,15 +474,25 @@ function attachListeners() {
         calcSupply();
     });
 
-    // Photo Preview
-    document.getElementById('hauling-photos').addEventListener('change', function(e) {
+    // Hauling Photo Compression & Preview
+    document.getElementById('hauling-photos').addEventListener('change', async function () {
         const preview = document.getElementById('photo-preview');
         preview.innerHTML = '';
-        [...this.files].slice(0, 3).forEach(file => {
-            const img = document.createElement('img');
-            img.src = URL.createObjectURL(file);
-            preview.appendChild(img);
-        });
+        state.haulingPhotoBlobs = [];
+
+        const files = [...this.files].slice(0, 3);
+        for (const file of files) {
+            try {
+                const compressedBlob = await compressImage(file);
+                state.haulingPhotoBlobs.push(compressedBlob);
+
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(compressedBlob);
+                preview.appendChild(img);
+            } catch (err) {
+                console.error("Photo compression error:", err);
+            }
+        }
     });
 
     // Checkout Form Submit
@@ -354,20 +505,20 @@ function getFee(selectId) {
 }
 
 function calcSupply() {
-    if(!state.selectedMaterial) return;
-    const qty = parseInt(document.getElementById('supply-qty').value);
+    if (!state.selectedMaterial) return;
+    const qty = parseInt(document.getElementById('supply-qty').value, 10);
     const matCost = state.selectedMaterial.price * qty;
     const delFee = getFee('supply-brgy');
     const total = matCost + delFee;
-    
+
     document.getElementById('supply-mat-cost').innerText = `₱${matCost.toLocaleString()}`;
     document.getElementById('supply-del-fee').innerText = `₱${delFee.toLocaleString()}`;
     document.getElementById('supply-total').innerText = `₱${total.toLocaleString()}`;
-    document.getElementById('supply-vol-estimate').innerText = `Approx. ${(qty*2.8).toFixed(1)} - ${(qty*3.0).toFixed(1)} cu.m.`;
+    document.getElementById('supply-vol-estimate').innerText = `Approx. ${(qty * 2.8).toFixed(1)} - ${(qty * 3.0).toFixed(1)} cu.m.`;
 }
 
 function calcHauling() {
-    const qty = parseInt(document.getElementById('hauling-qty').value);
+    const qty = parseInt(document.getElementById('hauling-qty').value, 10);
     const baseFee = appData.rates.haulingBase * qty;
     const addBackhoe = document.getElementById('hauling-backhoe').checked;
     const backhoeFee = addBackhoe ? appData.rates.backhoeAddon : 0;
@@ -381,11 +532,11 @@ function calcHauling() {
 }
 
 function calcRental() {
-    const days = parseInt(document.getElementById('rental-qty').value);
+    const days = parseInt(document.getElementById('rental-qty').value, 10);
     const baseFee = appData.rates.backhoeDaily * days;
     const mobFee = getFee('rental-brgy');
     const addHaul = document.getElementById('rental-hauling').checked;
-    const haulQty = parseInt(document.getElementById('rental-haul-qty').value);
+    const haulQty = parseInt(document.getElementById('rental-haul-qty').value, 10);
     const haulFee = addHaul ? (appData.rates.haulingAddon * haulQty) : 0;
     const total = baseFee + mobFee + haulFee;
 
@@ -395,86 +546,149 @@ function calcRental() {
     document.getElementById('rental-total').innerText = `₱${total.toLocaleString()}`;
 }
 
-window.prepareCheckout = function(tab) {
+window.prepareCheckout = function (tab) {
+    if (tab === 'supply' && !state.selectedMaterial) {
+        alert("No material is currently available to order.");
+        return;
+    }
+
+    const conflict = validateTabDate(tab);
+    if (conflict) {
+        const resName = conflict.resource === 'backhoe' ? 'PC30 Backhoe' : 'Dump Truck';
+        alert(`Sorry, the ${resName} is unavailable on ${conflict.date}. Please select another date.`);
+        return;
+    }
+
     state.checkoutTab = tab;
     document.getElementById('checkout-modal').style.display = 'flex';
 };
 
-window.closeModal = function(id) {
+window.closeModal = function (id) {
     document.getElementById(id).style.display = 'none';
 };
 
+function normalizePhPhone(raw) {
+    const digits = raw.replace(/\D/g, '');
+    if (/^09\d{9}$/.test(digits)) return digits;
+    if (/^639\d{9}$/.test(digits)) return '0' + digits.slice(2);
+    return null;
+}
+
 async function handleCheckoutSubmit(e) {
     e.preventDefault();
-    const btn = e.target.querySelector('button');
+    const btn = e.target.querySelector('button[type="submit"]');
+
+    const normalizedPhone = normalizePhPhone(document.getElementById('cust-phone').value);
+    if (!normalizedPhone) {
+        alert("Please enter a valid 11-digit Philippine mobile number (e.g., 0917 123 4567).");
+        return;
+    }
+
     btn.disabled = true;
     btn.innerText = "Processing...";
 
-    const ticketId = 'GBC-' + Math.floor(100000 + Math.random() * 900000);
-    const cust = {
-        name: document.getElementById('cust-name').value,
-        phone: document.getElementById('cust-phone').value,
-        address: document.getElementById('cust-address').value,
-        notes: document.getElementById('cust-notes').value,
-    };
+    try {
+        const ticketId = 'GBC-' + Math.floor(100000 + Math.random() * 900000);
+        const cust = {
+            name: document.getElementById('cust-name').value.trim(),
+            phone: normalizedPhone,
+            address: document.getElementById('cust-address').value.trim(),
+            notes: document.getElementById('cust-notes').value.trim()
+        };
 
-    let orderData = {
-        ticketId,
-        customer: cust,
-        location: state.location,
-        status: 'pending',
-        type: state.checkoutTab
-    };
-    let summaryText = `*GBC ORDER TICKET: ${ticketId}*\nName: ${cust.name}\nPhone: ${cust.phone}\nAddress: ${cust.address}\n\n*ORDER DETAILS:*\n`;
+        let photoUrls = [];
+        if (state.checkoutTab === 'hauling' && state.haulingPhotoBlobs.length > 0) {
+            btn.innerText = `Uploading photos (${state.haulingPhotoBlobs.length})...`;
+            photoUrls = await Promise.all(
+                state.haulingPhotoBlobs.map((blob, idx) =>
+                    DbService.uploadHaulingPhoto(blob, ticketId, idx + 1)
+                )
+            );
+            btn.innerText = "Saving ticket...";
+        }
 
-    if (state.checkoutTab === 'supply') {
-        const qty = document.getElementById('supply-qty').value;
-        const brgy = document.getElementById('supply-brgy').value;
-        const date = document.getElementById('supply-date').value;
-        const total = document.getElementById('supply-total').innerText;
-        orderData.details = { material: state.selectedMaterial.name, qty, brgy, date, total };
-        summaryText += `Service: Supply Delivery\nItem: ${state.selectedMaterial.name}\nLoads: ${qty}\nBarangay: ${brgy}\nDate: ${date}\n*Total Est: ${total}*`;
-    } 
-    else if (state.checkoutTab === 'hauling') {
-        const type = document.getElementById('hauling-type').value;
-        const qty = document.getElementById('hauling-qty').value;
-        const brgy = document.getElementById('hauling-brgy').value;
-        const date = document.getElementById('hauling-date').value;
-        const hasBackhoe = document.getElementById('hauling-backhoe').checked;
-        const total = document.getElementById('hauling-total').innerText;
-        orderData.details = { type, qty, hasBackhoe, brgy, date, total };
-        summaryText += `Service: Garbage Hauling\nType: ${type}\nLoads: ${qty}\nBackhoe Included: ${hasBackhoe?'Yes':'No'}\nBarangay: ${brgy}\nDate: ${date}\n*Total Est: ${total}*`;
+        const orderData = {
+            ticketId,
+            customer: cust,
+            location: state.location,
+            photos: photoUrls,
+            status: 'pending',
+            type: state.checkoutTab
+        };
+
+        let summaryText = `*GBC ORDER TICKET: ${ticketId}*\nName: ${cust.name}\nPhone: ${cust.phone}\nAddress: ${cust.address}\n\n*ORDER DETAILS:*\n`;
+
+        if (state.checkoutTab === 'supply') {
+            const qty = document.getElementById('supply-qty').value;
+            const brgy = document.getElementById('supply-brgy').value;
+            const date = document.getElementById('supply-date').value;
+            const total = document.getElementById('supply-total').innerText;
+            orderData.details = { material: state.selectedMaterial.name, qty, brgy, date, total };
+            summaryText += `Service: Supply Delivery\nItem: ${state.selectedMaterial.name}\nLoads: ${qty}\nBarangay: ${brgy}\nDate: ${date}\n*Total Est: ${total}*`;
+        } else if (state.checkoutTab === 'hauling') {
+            const type = document.getElementById('hauling-type').value;
+            const qty = document.getElementById('hauling-qty').value;
+            const brgy = document.getElementById('hauling-brgy').value;
+            const date = document.getElementById('hauling-date').value;
+            const hasBackhoe = document.getElementById('hauling-backhoe').checked;
+            const total = document.getElementById('hauling-total').innerText;
+            orderData.details = { type, qty, hasBackhoe, brgy, date, total };
+            summaryText += `Service: Garbage Hauling\nType: ${type}\nLoads: ${qty}\nBackhoe Included: ${hasBackhoe ? 'Yes' : 'No'}\nBarangay: ${brgy}\nDate: ${date}\n*Total Est: ${total}*`;
+            if (photoUrls.length > 0) {
+                summaryText += `\nSite Photos: ${photoUrls.length} attached`;
+            }
+        } else if (state.checkoutTab === 'rental') {
+            const job = document.getElementById('rental-job').value;
+            const days = document.getElementById('rental-qty').value;
+            const brgy = document.getElementById('rental-brgy').value;
+            const date = document.getElementById('rental-date').value;
+            const hasHaul = document.getElementById('rental-hauling').checked;
+            const haulQty = parseInt(document.getElementById('rental-haul-qty').value, 10);
+            const total = document.getElementById('rental-total').innerText;
+            orderData.details = {
+                job,
+                equipment: 'PC30 Backhoe',
+                days,
+                hasHaul,
+                haulQty: hasHaul ? haulQty : 0,
+                brgy,
+                date,
+                total
+            };
+            const haulText = hasHaul ? `Yes (${haulQty} load${haulQty > 1 ? 's' : ''})` : 'No';
+            summaryText += `Service: Equipment Rental\nUnit: PC30 Backhoe\nJob: ${job}\nDays: ${days}\nHauling Added: ${haulText}\nBarangay: ${brgy}\nStart Date: ${date}\n*Total Est: ${total}*`;
+        }
+
+        if (cust.notes) summaryText += `\n\nNotes: ${cust.notes}`;
+        if (state.location.mapUrl) summaryText += `\n📍 Map Pin: ${state.location.mapUrl}`;
+
+        await DbService.saveOrder(orderData);
+
+        closeModal('checkout-modal');
+        document.getElementById('receipt-ticket').innerText = ticketId;
+        document.getElementById('receipt-summary').innerText = summaryText;
+        document.getElementById('receipt-modal').style.display = 'flex';
+
+        const encodedText = encodeURIComponent(summaryText);
+        document.getElementById('btn-whatsapp').onclick = () => {
+            window.open(`https://wa.me/639174347647?text=${encodedText}`, '_blank');
+        };
+        document.getElementById('btn-messenger').onclick = () => {
+            const messengerUrl = MESSENGER_USERNAME
+                ? `https://m.me/${MESSENGER_USERNAME}`
+                : `https://m.me/`;
+            navigator.clipboard.writeText(summaryText).then(() => {
+                alert("Order details copied to clipboard! Paste them in the chat.");
+                window.open(messengerUrl, '_blank');
+            }).catch(() => {
+                window.open(messengerUrl, '_blank');
+            });
+        };
+    } catch (err) {
+        console.error("Checkout error:", err);
+        alert("Unable to submit booking: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Generate Order Ticket";
     }
-    else if (state.checkoutTab === 'rental') {
-        const job = document.getElementById('rental-job').value;
-        const days = document.getElementById('rental-qty').value;
-        const brgy = document.getElementById('rental-brgy').value;
-        const date = document.getElementById('rental-date').value;
-        const hasHaul = document.getElementById('rental-hauling').checked;
-        const total = document.getElementById('rental-total').innerText;
-        orderData.details = { job, equipment: 'PC30 Backhoe', days, hasHaul, brgy, date, total };
-        summaryText += `Service: Equipment Rental\nUnit: PC30 Backhoe\nJob: ${job}\nDays: ${days}\nHauling Added: ${hasHaul?'Yes':'No'}\nBarangay: ${brgy}\nStart Date: ${date}\n*Total Est: ${total}*`;
-    }
-
-    if (cust.notes) summaryText += `\n\nNotes: ${cust.notes}`;
-    if (state.location.mapUrl) summaryText += `\n📍 Map Pin: ${state.location.mapUrl}`;
-
-    await DbService.saveOrder(orderData);
-
-    closeModal('checkout-modal');
-    document.getElementById('receipt-ticket').innerText = ticketId;
-    document.getElementById('receipt-summary').innerText = summaryText;
-    document.getElementById('receipt-modal').style.display = 'flex';
-
-    // Setup Messenger / WhatsApp Links
-    const encodedText = encodeURIComponent(summaryText);
-    document.getElementById('btn-whatsapp').onclick = () => {
-        window.open(`https://wa.me/639174347647?text=${encodedText}`, '_blank');
-    };
-    document.getElementById('btn-messenger').onclick = () => {
-        navigator.clipboard.writeText(summaryText).then(() => {
-            alert("Order details copied to clipboard! Paste them in the chat.");
-            window.open(`https://m.me/`, '_blank');
-        });
-    };
 }

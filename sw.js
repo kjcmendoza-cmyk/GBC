@@ -1,9 +1,9 @@
-const CACHE_NAME = 'gbc-davao-v7';
+const CACHE_NAME = 'gbc-davao-v8';
 const ASSETS = [
   './',
   './index.html',
   './admin.html',
-  './styles.css',
+  './styles.css?v=4',
   './app.js',
   './admin.js',
   './davao-data.js',
@@ -28,11 +28,18 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Only cache same-origin GET requests; let Firebase, map tiles, and geocoding pass straight through
+  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
         return response;
       })
       .catch(() => caches.match(event.request))
