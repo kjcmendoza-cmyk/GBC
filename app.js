@@ -479,7 +479,10 @@ function attachListeners() {
         });
     };
     bindStepper('hauling-minus', 'hauling-plus', 'hauling-qty', calcHauling);
-    bindStepper('rental-minus', 'rental-plus', 'rental-qty', calcRental);
+    bindStepper('rental-minus', 'rental-plus', 'rental-qty', () => {
+    calcRental();
+    validateTabDate('rental');
+});
     bindStepper('rental-haul-minus', 'rental-haul-plus', 'rental-haul-qty', calcRental);
 
     // Date change validation

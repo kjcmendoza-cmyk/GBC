@@ -3,7 +3,7 @@ const ASSETS = [
   './',
   './index.html',
   './admin.html',
-  './styles.css?v=4',
+  './styles.css?v=5',
   './app.js',
   './admin.js',
   './davao-data.js',
