@@ -144,14 +144,20 @@ async updateOrderDetails(id, newQty, newTotal) {
         await setDoc(doc(db, "settings", "global"), settings);
     },
 
-    async uploadHaulingPhoto(blob) {
-    return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Failed to encode photo'));
-        reader.readAsDataURL(blob);
-    });
-},
+    async uploadHaulingPhoto(blob, ticketId = 'misc', index = 1) {
+        if (DEMO_MODE) {
+            return await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('Failed to encode photo'));
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        const storageRef = ref(storage, `hauling-photos/${ticketId}/photo-${index}-${Date.now()}.jpg`);
+        await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
+        return await getDownloadURL(storageRef);
+    },
 
     async getBlockedDates() {
         if (DEMO_MODE) {

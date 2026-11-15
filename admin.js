@@ -3,6 +3,7 @@ import { getAppData } from './davao-data.js';
 
 let appData;
 let dashboardInitialized = false;
+let cachedOrders = [];
 
 const DETAIL_LABELS = {
     material: 'Material',
@@ -27,12 +28,15 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
-
+function getLocalTodayStr() {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+}
 document.addEventListener("DOMContentLoaded", () => {
     // Prevent selecting past dates when blocking
     const blockDateInput = document.getElementById('block-date');
     if (blockDateInput) {
-        blockDateInput.min = new Date().toISOString().split('T')[0];
+        blockDateInput.min = getLocalTodayStr();
     }
 
     // Real Firebase Auth state listener
@@ -77,7 +81,7 @@ async function showDashboard() {
 
     appData = await getAppData();
     populateSettings();
-    await Promise.all([loadOrders(), loadBlockedDates()]);
+    await Promise.all([refreshOrders(true), loadBlockedDates()]);
 
     if (dashboardInitialized) return;
     dashboardInitialized = true;
@@ -92,9 +96,14 @@ async function showDashboard() {
         });
     });
 
-    document.getElementById('status-filter').addEventListener('change', loadOrders);
-    document.getElementById('date-filter').addEventListener('change', loadOrders);
-    document.getElementById('order-search').addEventListener('input', loadOrders);
+    document.getElementById('status-filter').addEventListener('change', renderOrders);
+    document.getElementById('date-filter').addEventListener('change', renderOrders);
+
+    let searchTimer;
+    document.getElementById('order-search').addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(renderOrders, 200);
+    });
 
     // Manual Block Date Submit
     document.getElementById('block-form').addEventListener('submit', async (e) => {
@@ -133,6 +142,7 @@ async function showDashboard() {
             appData.fleet.trucks = parseInt(document.getElementById('set-trucks').value, 10);
             appData.fleet.backhoes = parseInt(document.getElementById('set-backhoes').value, 10);
             appData.rates.haulingBase = parseInt(document.getElementById('set-hauling').value, 10);
+            appData.rates.haulingAddon = parseInt(document.getElementById('set-hauling-addon').value, 10);
             appData.rates.backhoeDaily = parseInt(document.getElementById('set-backhoe-daily').value, 10);
             appData.rates.backhoeAddon = parseInt(document.getElementById('set-backhoe-addon').value, 10);
 
@@ -198,7 +208,7 @@ function addDaysToDateStr(dateStr, daysToAdd) {
 async function syncFleetAvailability() {
     try {
         const [allOrders, blocks] = await Promise.all([
-            DbService.getOrders('All'),
+            cachedOrders.length ? Promise.resolve(cachedOrders) : DbService.getOrders('All'),
             DbService.getBlockedDates()
         ]);
 
@@ -263,105 +273,118 @@ window.editOrderQuote = async function(id, currentQty, currentTotal) {
 
     try {
         await DbService.updateOrderDetails(id, newQty, newTotal.trim());
-        await loadOrders();
+        await refreshOrders(false);
     } catch (err) {
         alert("Failed to update order: " + err.message);
     }
 };
-async function loadOrders() {
-    const filter = document.getElementById('status-filter').value;
-    const dateFilter = document.getElementById('date-filter')?.value || 'all';
-    const search = (document.getElementById('order-search')?.value || '').trim().toLowerCase();
+
+async function refreshOrders(shouldSyncAvailability = false) {
     const container = document.getElementById('orders-list');
     container.innerHTML = `<p class="sub-text" style="text-align:center; padding: 1rem 0;">Loading orders...</p>`;
 
     try {
-        let orders = await DbService.getOrders(filter);
-        await syncFleetAvailability();
-
-        const now = new Date();
-        const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        const tomorrow = addDaysToDateStr(today, 1);
-
-        if (dateFilter === 'today') orders = orders.filter(o => o.details?.date === today);
-        else if (dateFilter === 'tomorrow') orders = orders.filter(o => o.details?.date === tomorrow);
-        else if (dateFilter === 'upcoming') orders = orders.filter(o => (o.details?.date || '') >= today);
-
-        if (search) {
-            orders = orders.filter(o =>
-                (o.ticketId || '').toLowerCase().includes(search) ||
-                (o.customer?.name || '').toLowerCase().includes(search) ||
-                (o.details?.brgy || '').toLowerCase().includes(search) ||
-                (o.customer?.phone || '').includes(search)
-            );
+        cachedOrders = await DbService.getOrders('All');
+        if (shouldSyncAvailability) {
+            await syncFleetAvailability();
         }
-
-        if (orders.length === 0) {
-            container.innerHTML = `<p class="sub-text" style="text-align:center; padding: 1.5rem 0;">No orders found matching your filters.</p>`;
-            return;
-        }
-
-        container.innerHTML = orders.map(o => {
-            const detailItems = Object.entries(o.details || {}).map(([k, v]) => {
-                const label = DETAIL_LABELS[k] || k;
-                const val = typeof v === 'boolean' ? (v ? 'Yes' : 'No') : escapeHtml(v);
-                return `<li>${escapeHtml(label)}: <strong>${val}</strong></li>`;
-            }).join('');
-
-            const photosHtml = (o.photos && o.photos.length > 0) ? `
-                <div style="margin-top:8px;">
-                    <strong style="font-size:0.82rem;">Site Photos:</strong>
-                    <div class="photo-preview-grid">
-                        ${o.photos.map(url => `
-                            <a href="${escapeHtml(url)}" target="_blank" rel="noopener">
-                                <img src="${escapeHtml(url)}" alt="Waste pile photo">
-                            </a>
-                        `).join('')}
-                    </div>
-                </div>
-            ` : '';
-
-            const waPhone = (o.customer?.phone || '').replace(/^0/, '63');
-            const waMsg = encodeURIComponent(
-                `Hello ${o.customer?.name || ''}! Your GBC Davao booking (${o.ticketId}) for ${o.details?.date || 'your scheduled date'} is CONFIRMED. Total Est: ${o.details?.total || ''}. Thank you!`
-            );
-
-            return `
-                <div class="order-card">
-                    <div class="order-header">
-                        <span>${escapeHtml(o.ticketId || o.id)} • ${escapeHtml((o.type || '').toUpperCase())}</span>
-                        <span class="status-badge status-${escapeHtml(o.status)}">${escapeHtml(o.status)}</span>
-                    </div>
-                    <p><strong>Customer:</strong> ${escapeHtml(o.customer?.name)}</p>
-                    <p><strong>Phone:</strong> <a href="tel:${escapeHtml(o.customer?.phone)}">${escapeHtml(o.customer?.phone)}</a></p>
-                    <p><strong>Address:</strong> ${escapeHtml(o.customer?.address)}</p>
-                    ${o.customer?.notes ? `<p><strong>Notes:</strong> ${escapeHtml(o.customer.notes)}</p>` : ''}
-                    ${o.location?.mapUrl ? `<p style="margin-top:6px;"><a href="${escapeHtml(o.location.mapUrl)}" target="_blank" rel="noopener" style="color:#059669; font-weight:700; text-decoration:none;">📍 View Pinned Location on Map →</a></p>` : ''}
-                    <hr style="margin:10px 0; border:0; border-top:1px solid #E2E8F0;">
-                    <p><strong>Details:</strong></p>
-                    <ul style="margin-left: 20px; font-size: 0.88rem;">
-                        ${detailItems}
-                    </ul>
-                    ${photosHtml}
-                    <div style="margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px;">
-                        ${o.status === 'pending' ? `<button class="btn btn-primary" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${escapeHtml(o.id)}', 'confirmed')">Confirm</button>` : ''}
-                        ${o.status === 'confirmed' ? `<button class="btn btn-whatsapp" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${escapeHtml(o.id)}', 'completed')">Complete</button>` : ''}
-                        ${o.status === 'confirmed' && waPhone ? `<a href="https://wa.me/${escapeHtml(waPhone)}?text=${waMsg}" target="_blank" rel="noopener" class="btn btn-secondary" style="flex:1; padding: 0.55rem; text-decoration:none;">WhatsApp</a>` : ''}
-                        ${(o.status === 'pending' || o.status === 'confirmed') && o.type !== 'rental' ? `<button class="btn btn-purple-outline" style="padding: 0.55rem 0.75rem;" onclick="editOrderQuote('${escapeHtml(o.id)}', '${escapeHtml(o.details?.qty || 1)}', '${escapeHtml(o.details?.total || '')}')">Edit Qty/₱</button>` : ''}
-                        ${o.status !== 'completed' && o.status !== 'cancelled' ? `<button class="btn btn-secondary" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${escapeHtml(o.id)}', 'cancelled')">Cancel</button>` : ''}
-                    </div>
-                </div>
-            `;
-        }).join('');
+        renderOrders();
     } catch (err) {
         container.innerHTML = `<p style="color:#B91C1C; text-align:center;">Failed to load orders: ${escapeHtml(err.message)}</p>`;
     }
 }
 
+function renderOrders() {
+    const filter = document.getElementById('status-filter').value;
+    const dateFilter = document.getElementById('date-filter')?.value || 'all';
+    const search = (document.getElementById('order-search')?.value || '').trim().toLowerCase();
+    const container = document.getElementById('orders-list');
+
+    let orders = [...cachedOrders];
+
+    if (filter !== 'All') {
+        orders = orders.filter(o => o.status === filter);
+    }
+
+    const today = getLocalTodayStr();
+    const tomorrow = addDaysToDateStr(today, 1);
+
+    if (dateFilter === 'today') orders = orders.filter(o => o.details?.date === today);
+    else if (dateFilter === 'tomorrow') orders = orders.filter(o => o.details?.date === tomorrow);
+    else if (dateFilter === 'upcoming') orders = orders.filter(o => (o.details?.date || '') >= today);
+
+    if (search) {
+        orders = orders.filter(o =>
+            (o.ticketId || '').toLowerCase().includes(search) ||
+            (o.customer?.name || '').toLowerCase().includes(search) ||
+            (o.details?.brgy || '').toLowerCase().includes(search) ||
+            (o.customer?.phone || '').includes(search)
+        );
+    }
+
+    if (orders.length === 0) {
+        container.innerHTML = `<p class="sub-text" style="text-align:center; padding: 1.5rem 0;">No orders found matching your filters.</p>`;
+        return;
+    }
+
+    container.innerHTML = orders.map(o => {
+        const detailItems = Object.entries(o.details || {}).map(([k, v]) => {
+            const label = DETAIL_LABELS[k] || k;
+            const val = typeof v === 'boolean' ? (v ? 'Yes' : 'No') : escapeHtml(v);
+            return `<li>${escapeHtml(label)}: <strong>${val}</strong></li>`;
+        }).join('');
+
+        const photosHtml = (o.photos && o.photos.length > 0) ? `
+            <div style="margin-top:8px;">
+                <strong style="font-size:0.82rem;">Site Photos:</strong>
+                <div class="photo-preview-grid">
+                    ${o.photos.map(url => `
+                        <a href="${escapeHtml(url)}" target="_blank" rel="noopener">
+                            <img src="${escapeHtml(url)}" alt="Waste pile photo">
+                        </a>
+                    `).join('')}
+                </div>
+            </div>
+        ` : '';
+
+        const waPhone = (o.customer?.phone || '').replace(/^0/, '63');
+        const waMsg = encodeURIComponent(
+            `Hello ${o.customer?.name || ''}! Your GBC Davao booking (${o.ticketId}) for ${o.details?.date || 'your scheduled date'} is CONFIRMED. Total Est: ${o.details?.total || ''}. Thank you!`
+        );
+
+        return `
+            <div class="order-card">
+                <div class="order-header">
+                    <span>${escapeHtml(o.ticketId || o.id)} • ${escapeHtml((o.type || '').toUpperCase())}</span>
+                    <span class="status-badge status-${escapeHtml(o.status)}">${escapeHtml(o.status)}</span>
+                </div>
+                <p><strong>Customer:</strong> ${escapeHtml(o.customer?.name)}</p>
+                <p><strong>Phone:</strong> <a href="tel:${escapeHtml(o.customer?.phone)}">${escapeHtml(o.customer?.phone)}</a></p>
+                <p><strong>Address:</strong> ${escapeHtml(o.customer?.address)}</p>
+                ${o.customer?.notes ? `<p><strong>Notes:</strong> ${escapeHtml(o.customer.notes)}</p>` : ''}
+                ${o.location?.mapUrl ? `<p style="margin-top:6px;"><a href="${escapeHtml(o.location.mapUrl)}" target="_blank" rel="noopener" style="color:#059669; font-weight:700; text-decoration:none;">📍 View Pinned Location on Map →</a></p>` : ''}
+                <hr style="margin:10px 0; border:0; border-top:1px solid #E2E8F0;">
+                <p><strong>Details:</strong></p>
+                <ul style="margin-left: 20px; font-size: 0.88rem;">
+                    ${detailItems}
+                </ul>
+                ${photosHtml}
+                <div style="margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px;">
+                    ${o.status === 'pending' ? `<button class="btn btn-primary" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${escapeHtml(o.id)}', 'confirmed')">Confirm</button>` : ''}
+                    ${o.status === 'confirmed' ? `<button class="btn btn-whatsapp" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${escapeHtml(o.id)}', 'completed')">Complete</button>` : ''}
+                    ${o.status === 'confirmed' && waPhone ? `<a href="https://wa.me/${escapeHtml(waPhone)}?text=${waMsg}" target="_blank" rel="noopener" class="btn btn-secondary" style="flex:1; padding: 0.55rem; text-decoration:none;">WhatsApp</a>` : ''}
+                    ${(o.status === 'pending' || o.status === 'confirmed') && o.type !== 'rental' ? `<button class="btn btn-purple-outline" style="padding: 0.55rem 0.75rem;" onclick="editOrderQuote('${escapeHtml(o.id)}', '${escapeHtml(o.details?.qty || 1)}', '${escapeHtml(o.details?.total || '')}')">Edit Qty/₱</button>` : ''}
+                    ${o.status !== 'completed' && o.status !== 'cancelled' ? `<button class="btn btn-secondary" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${escapeHtml(o.id)}', 'cancelled')">Cancel</button>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
 window.updateStatus = async function(id, status) {
     try {
         await DbService.updateOrderStatus(id, status);
-        await loadOrders();
+        await refreshOrders(true);
     } catch (err) {
         alert("Failed to update status: " + err.message);
     }
@@ -375,6 +398,7 @@ function populateSettings() {
     document.getElementById('set-trucks').value = appData.fleet.trucks;
     document.getElementById('set-backhoes').value = appData.fleet.backhoes;
     document.getElementById('set-hauling').value = appData.rates.haulingBase;
+    document.getElementById('set-hauling-addon').value = appData.rates.haulingAddon ?? 1200;
     document.getElementById('set-backhoe-daily').value = appData.rates.backhoeDaily;
     document.getElementById('set-backhoe-addon').value = appData.rates.backhoeAddon;
 

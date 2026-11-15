@@ -99,43 +99,56 @@ function initUI() {
     calcRental();
 }
 
+function addDaysToDateStr(dateStr, daysToAdd) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + daysToAdd);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
 function getBlockedConflict(tab) {
     const dateInput = document.getElementById(`${tab}-date`);
     const selectedDate = dateInput?.value;
     if (!selectedDate) return null;
 
-    const neededResources = [];
+    const checks = [];
     if (tab === 'supply') {
-        neededResources.push('truck');
+        checks.push({ resource: 'truck', date: selectedDate });
     } else if (tab === 'hauling') {
-        neededResources.push('truck');
+        checks.push({ resource: 'truck', date: selectedDate });
         if (document.getElementById('hauling-backhoe').checked) {
-            neededResources.push('backhoe');
+            checks.push({ resource: 'backhoe', date: selectedDate });
         }
     } else if (tab === 'rental') {
-        neededResources.push('backhoe');
+        const days = Math.max(1, parseInt(document.getElementById('rental-qty')?.value || 1, 10));
+        for (let i = 0; i < days; i++) {
+            checks.push({ resource: 'backhoe', date: addDaysToDateStr(selectedDate, i) });
+        }
         if (document.getElementById('rental-hauling').checked) {
-            neededResources.push('truck');
+            checks.push({ resource: 'truck', date: selectedDate });
         }
     }
 
-    const dayUsage = availability[selectedDate] || {};
     const maxTrucks = appData.fleet?.trucks || 4;
     const maxBackhoes = appData.fleet?.backhoes || 2;
 
-    for (const res of neededResources) {
-        if (res === 'backhoe') {
-            const fullBlock = dayUsage.fullBlockBackhoe || blockedDates.some(b => b.date === selectedDate && b.resource === 'backhoe' && (!b.units || b.units === 'all'));
+    for (const check of checks) {
+        const dayUsage = availability[check.date] || {};
+        if (check.resource === 'backhoe') {
+            const fullBlock = dayUsage.fullBlockBackhoe || blockedDates.some(
+                b => b.date === check.date && b.resource === 'backhoe' && (!b.units || b.units === 'all')
+            );
             const used = dayUsage.backhoes || 0;
             if (fullBlock || used >= maxBackhoes) {
-                return { resource: 'backhoe', date: selectedDate, notes: dayUsage.notes?.backhoe || 'Fully booked' };
+                return { resource: 'backhoe', date: check.date, notes: dayUsage.notes?.backhoe || 'Fully booked' };
             }
         }
-        if (res === 'truck') {
-            const fullBlock = dayUsage.fullBlockTruck || blockedDates.some(b => b.date === selectedDate && b.resource === 'truck' && (!b.units || b.units === 'all'));
+        if (check.resource === 'truck') {
+            const fullBlock = dayUsage.fullBlockTruck || blockedDates.some(
+                b => b.date === check.date && b.resource === 'truck' && (!b.units || b.units === 'all')
+            );
             const used = dayUsage.trucks || 0;
             if (fullBlock || used >= maxTrucks) {
-                return { resource: 'truck', date: selectedDate, notes: dayUsage.notes?.truck || 'Fully booked' };
+                return { resource: 'truck', date: check.date, notes: dayUsage.notes?.truck || 'Fully booked' };
             }
         }
     }
@@ -263,13 +276,25 @@ function initMapPicker() {
     });
 }
 
-async function updatePinnedLocation(lat, lng, reverseLookup = true, presetAddress = '') {
+let reverseGeocodeTimer;
+
+function updatePinnedLocation(lat, lng, reverseLookup = true, presetAddress = '') {
     const label = document.getElementById('map-pinned-label');
     const mapUrl = `https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
-    let resolvedAddress = presetAddress;
+    clearTimeout(reverseGeocodeTimer);
 
-    if (reverseLookup) {
-        label.innerText = "Fetching street address...";
+    if (!reverseLookup) {
+        state.location = { lat, lng, address: presetAddress, mapUrl };
+        label.innerHTML = `<strong>Pinned:</strong> ${presetAddress}`;
+        const custAddressEl = document.getElementById('cust-address');
+        if (custAddressEl) custAddressEl.value = presetAddress;
+        autoMatchBarangayFee(presetAddress, lat, lng);
+        return;
+    }
+
+    label.innerText = "Fetching street address...";
+    reverseGeocodeTimer = setTimeout(async () => {
+        let resolvedAddress;
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
             const data = await res.json();
@@ -277,15 +302,15 @@ async function updatePinnedLocation(lat, lng, reverseLookup = true, presetAddres
         } catch {
             resolvedAddress = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
         }
-    }
 
-    state.location = { lat, lng, address: resolvedAddress, mapUrl };
-    label.innerHTML = `<strong>Pinned:</strong> ${resolvedAddress}`;
+        state.location = { lat, lng, address: resolvedAddress, mapUrl };
+        label.innerHTML = `<strong>Pinned:</strong> ${resolvedAddress}`;
 
-    const custAddressEl = document.getElementById('cust-address');
-    if (custAddressEl) custAddressEl.value = resolvedAddress;
+        const custAddressEl = document.getElementById('cust-address');
+        if (custAddressEl) custAddressEl.value = resolvedAddress;
 
-    autoMatchBarangayFee(resolvedAddress, lat, lng);
+        autoMatchBarangayFee(resolvedAddress, lat, lng);
+    }, 400);
 }
 
 function getDistanceKmFromWaan(lat, lng) {

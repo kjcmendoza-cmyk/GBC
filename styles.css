@@ -268,43 +268,15 @@ h1, h2, h3, .brand-name {
 }
 
 .mat-card h4 {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
     color: var(--text-dark);
     font-size: 0.98rem;
-    margin-bottom: 0.35rem;
-}
-
-/* Radio/Check Indicator inside Material Cards */
-.mat-card h4::before {
-    content: "";
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 19px;
-    height: 19px;
-    border-radius: 50%;
-    border: 2px solid #CBD5E1;
-    background: white;
-    flex-shrink: 0;
-    transition: 0.15s;
-}
-
-.mat-card.selected h4::before {
-    content: "✓";
-    background: var(--green-main);
-    border-color: var(--green-main);
-    color: white;
-    font-size: 0.72rem;
-    font-weight: 800;
+    margin-bottom: 0.25rem;
 }
 
 .mat-card p {
     color: var(--purple-main);
     font-weight: 700;
     font-size: 0.92rem;
-    padding-left: 1.7rem;
 }
 
 .mat-card.selected p {
