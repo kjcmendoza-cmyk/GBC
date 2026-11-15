@@ -2,13 +2,14 @@ import { getAppData } from './davao-data.js';
 import { DbService } from './firebase-config.js';
 
 // Optional: Put your Facebook Page username here (e.g., 'gbcdavao') so Messenger opens your page directly
-const MESSENGER_USERNAME = '';
+const MESSENGER_USERNAME = 'gbcdavao';
 
 let appData;
 let blockedDates = [];
+let availability = {};
 let map, marker;
 let state = {
-    selectedMaterial: null,
+    materialQtys: {},
     checkoutTab: null,
     haulingPhotoBlobs: [],
     location: {
@@ -33,9 +34,10 @@ function getLocalTomorrowStr() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-    [appData, blockedDates] = await Promise.all([
+    [appData, blockedDates, availability] = await Promise.all([
         getAppData(),
-        DbService.getBlockedDates().catch(() => [])
+        DbService.getBlockedDates().catch(() => []),
+        DbService.getAvailability().catch(() => ({}))
     ]);
 
     initUI();
@@ -54,21 +56,17 @@ function initUI() {
         select.innerHTML = brgyHTML;
     });
 
-    // Populate Materials (Tab 1)
+    // Populate Materials (Tab 1) with individual load steppers
     const matGrid = document.getElementById('material-list');
     const availableMaterials = appData.materials.filter(m => m.inStock);
 
     if (availableMaterials.length === 0) {
         matGrid.innerHTML = `<p class="sub-text">All materials are currently out of stock. Please call dispatch for updates.</p>`;
     } else {
-        matGrid.innerHTML = availableMaterials.map((m, i) => `
-            <div class="mat-card ${i === 0 ? 'selected' : ''}" data-id="${m.id}" data-price="${m.price}" data-name="${m.name}">
-                <h4>${m.name}</h4>
-                <p>₱${m.price.toLocaleString()}/load</p>
-            </div>
-        `).join('');
-        state.selectedMaterial = availableMaterials[0];
-        syncCalculatorWithMaterial(state.selectedMaterial.id);
+        availableMaterials.forEach((m, i) => {
+            state.materialQtys[m.id] = i === 0 ? 1 : 0;
+        });
+        renderMaterialCards();
     }
 
     // Initialize Dates to tomorrow & prevent selecting past dates
@@ -121,9 +119,28 @@ function getBlockedConflict(tab) {
         }
     }
 
-    return blockedDates.find(
-        b => b.date === selectedDate && neededResources.includes(b.resource)
-    ) || null;
+    const dayUsage = availability[selectedDate] || {};
+    const maxTrucks = appData.fleet?.trucks || 4;
+    const maxBackhoes = appData.fleet?.backhoes || 2;
+
+    for (const res of neededResources) {
+        if (res === 'backhoe') {
+            const fullBlock = dayUsage.fullBlockBackhoe || blockedDates.some(b => b.date === selectedDate && b.resource === 'backhoe' && (!b.units || b.units === 'all'));
+            const used = dayUsage.backhoes || 0;
+            if (fullBlock || used >= maxBackhoes) {
+                return { resource: 'backhoe', date: selectedDate, notes: dayUsage.notes?.backhoe || 'Fully booked' };
+            }
+        }
+        if (res === 'truck') {
+            const fullBlock = dayUsage.fullBlockTruck || blockedDates.some(b => b.date === selectedDate && b.resource === 'truck' && (!b.units || b.units === 'all'));
+            const used = dayUsage.trucks || 0;
+            if (fullBlock || used >= maxTrucks) {
+                return { resource: 'truck', date: selectedDate, notes: dayUsage.notes?.truck || 'Fully booked' };
+            }
+        }
+    }
+
+    return null;
 }
 
 function validateTabDate(tab) {
@@ -268,30 +285,81 @@ async function updatePinnedLocation(lat, lng, reverseLookup = true, presetAddres
     const custAddressEl = document.getElementById('cust-address');
     if (custAddressEl) custAddressEl.value = resolvedAddress;
 
-    autoMatchBarangayFee(resolvedAddress);
+    autoMatchBarangayFee(resolvedAddress, lat, lng);
 }
 
-function autoMatchBarangayFee(addressText) {
-    const lower = addressText.toLowerCase();
-    const keywords = ['poblacion', 'agdao', 'buhangin', 'talomo', 'toril', 'tugbok', 'calinan', 'waan'];
-    const matched = keywords.find(k => lower.includes(k));
-    if (!matched) return;
+function getDistanceKmFromWaan(lat, lng) {
+    const waanLat = 7.1365, waanLng = 125.6050; // Waan, Davao City HQ
+    const toRad = deg => (deg * Math.PI) / 180;
+    const dLat = toRad(lat - waanLat);
+    const dLng = toRad(lng - waanLng);
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(toRad(waanLat)) * Math.cos(toRad(lat)) * Math.sin(dLng / 2) ** 2;
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
+function selectBarangayByKeyword(keyword) {
     document.querySelectorAll('.brgy-select').forEach(select => {
         for (let i = 0; i < select.options.length; i++) {
-            if (select.options[i].value.toLowerCase().includes(matched)) {
+            if (select.options[i].value.toLowerCase().includes(keyword)) {
                 select.selectedIndex = i;
                 break;
             }
         }
     });
+}
+
+function autoMatchBarangayFee(addressText, lat, lng) {
+    const lower = addressText.toLowerCase();
+
+    const zoneMap = [
+        { key: 'waan', terms: ['waan'] },
+        { key: 'calinan', terms: ['calinan', 'lacson', 'wangan', 'subasta', 'sirib', 'tamayong', 'baguio district', 'malagos', 'marilog', 'buda'] },
+        { key: 'toril', terms: ['toril', 'daliao', 'lubogan', 'lizada', 'sirawan', 'binugao', 'marapangi', 'mulig', 'catigan', 'eden', 'bayabas', 'bato'] },
+        { key: 'tugbok', terms: ['tugbok', 'mintal', 'catalunan', 'tacunan', 'ulos', 'biao', 'manambulan', 'los amigos', 'matina pangi'] },
+        { key: 'talomo', terms: ['talomo', 'matina', 'ecoland', 'maa', 'ma-a', 'bangkal', 'bago aplaya', 'bago gallera', 'dumoy', 'puan', 'ulasan', 'langub', 'magtuod'] },
+        { key: 'buhangin', terms: ['buhangin', 'cabantian', 'communal', 'indangan', 'mandug', 'tigatto', 'acacia', 'sasa', 'panacan', 'ilang', 'tibungco', 'bunawan', 'lasang', 'pampanga', 'lanang', 'damosa', 'bajad', 'mamay'] },
+        { key: 'agdao', terms: ['agdao', 'lapu-lapu', 'ubalde', 'leon garcia', 'cabaguio', 'r. castillo'] },
+        { key: 'poblacion', terms: ['poblacion', 'san pedro', 'claveria', 'rojas', 'roxas', 'obrero', 'bankerohan', 'bucana', 'bolton', 'jacinto', 'quirino', 'torres'] }
+    ];
+
+    const matchedZone = zoneMap.find(z => z.terms.some(t => lower.includes(t)));
+
+    if (matchedZone) {
+        selectBarangayByKeyword(matchedZone.key);
+    } else if (typeof lat === 'number' && typeof lng === 'number') {
+        // Fallback by straight-line distance from Waan HQ so outer pins never default to ₱0
+        const km = getDistanceKmFromWaan(lat, lng);
+        if (km > 22) selectBarangayByKeyword('calinan');
+        else if (km > 13) selectBarangayByKeyword('toril');
+        else selectBarangayByKeyword('buhangin');
+    }
 
     calcSupply();
     calcHauling();
     calcRental();
 }
 
-function compressImage(file, maxDimension = 1200, quality = 0.75) {
+function panMapToBarangay(brgyName) {
+    if (!map || !marker || state.location.address) return;
+    const lower = brgyName.toLowerCase();
+    const coords = {
+        waan: [7.1365, 125.6050],
+        poblacion: [7.0644, 125.6078],
+        agdao: [7.0864, 125.6267],
+        buhangin: [7.1156, 125.6164],
+        talomo: [7.0544, 125.5683],
+        toril: [7.0186, 125.4956],
+        tugbok: [7.0833, 125.5000],
+        calinan: [7.1869, 125.4542]
+    };
+    const key = Object.keys(coords).find(k => lower.includes(k));
+    if (key) {
+        map.setView(coords[key], 14);
+        marker.setLatLng(coords[key]);
+    }
+}
+function compressImage(file, maxDimension = 800, quality = 0.65) {
     return new Promise((resolve, reject) => {
         const img = new Image();
         const objectUrl = URL.createObjectURL(file);
@@ -352,23 +420,21 @@ function attachListeners() {
         });
     });
 
-    // Material Selection
+    // Material Per-Card Steppers
     document.getElementById('material-list').addEventListener('click', (e) => {
-        const card = e.target.closest('.mat-card');
-        if (!card) return;
-        document.querySelectorAll('.mat-card').forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        state.selectedMaterial = {
-            id: card.dataset.id,
-            name: card.dataset.name,
-            price: parseFloat(card.dataset.price)
-        };
-        syncCalculatorWithMaterial(state.selectedMaterial.id);
-        runVolumeCalc();
+        const minusBtn = e.target.closest('.mat-step-minus');
+        const plusBtn = e.target.closest('.mat-step-plus');
+        if (!minusBtn && !plusBtn) return;
+
+        const id = (minusBtn || plusBtn).dataset.id;
+        const current = state.materialQtys[id] || 0;
+        state.materialQtys[id] = minusBtn ? Math.max(0, current - 1) : current + 1;
+
+        renderMaterialCards();
         calcSupply();
     });
 
-    // Steppers
+    // Steppers (Hauling & Rental)
     const bindStepper = (minusId, plusId, inputId, callback) => {
         document.getElementById(minusId).addEventListener('click', () => {
             const v = parseInt(document.getElementById(inputId).value, 10);
@@ -387,7 +453,6 @@ function attachListeners() {
             }
         });
     };
-    bindStepper('supply-minus', 'supply-plus', 'supply-qty', calcSupply);
     bindStepper('hauling-minus', 'hauling-plus', 'hauling-qty', calcHauling);
     bindStepper('rental-minus', 'rental-plus', 'rental-qty', calcRental);
     bindStepper('rental-haul-minus', 'rental-haul-plus', 'rental-haul-qty', calcRental);
@@ -398,42 +463,79 @@ function attachListeners() {
     document.getElementById('rental-date').addEventListener('change', () => validateTabDate('rental'));
 
     // Dynamic Selects & Checkboxes
-    document.getElementById('supply-brgy').addEventListener('change', calcSupply);
+    document.getElementById('supply-brgy').addEventListener('change', (e) => {
+        panMapToBarangay(e.target.value);
+        calcSupply();
+    });
 
-    document.getElementById('hauling-brgy').addEventListener('change', calcHauling);
+    document.getElementById('hauling-brgy').addEventListener('change', (e) => {
+        panMapToBarangay(e.target.value);
+        calcHauling();
+    });
     document.getElementById('hauling-backhoe').addEventListener('change', (e) => {
         document.getElementById('hauling-backhoe-row').style.display = e.target.checked ? 'flex' : 'none';
         calcHauling();
         validateTabDate('hauling');
     });
 
-    document.getElementById('rental-brgy').addEventListener('change', calcRental);
-    document.getElementById('rental-hauling').addEventListener('change', (e) => {
-        document.getElementById('rental-hauling-options').style.display = e.target.checked ? 'flex' : 'none';
-        document.getElementById('rental-haul-row').style.display = e.target.checked ? 'flex' : 'none';
+    document.getElementById('rental-brgy').addEventListener('change', (e) => {
+        panMapToBarangay(e.target.value);
         calcRental();
-        validateTabDate('rental');
+    });
+document.getElementById('rental-hauling').addEventListener('change', (e) => {
+    document.getElementById('rental-hauling-options').style.display = e.target.checked ? 'flex' : 'none';
+    document.getElementById('rental-haul-row').style.display = e.target.checked ? 'flex' : 'none';
+    calcRental();
+    validateTabDate('rental');
+});
+    // Multi-Section Volume Calculator
+    addCalcSectionRow();
+
+    document.getElementById('btn-add-section').addEventListener('click', () => {
+        addCalcSectionRow();
     });
 
-    // Volume Calculator
-    ['calc-l', 'calc-w', 'calc-d', 'calc-l-unit', 'calc-w-unit', 'calc-d-unit', 'calc-purpose'].forEach(id => {
-        const el = document.getElementById(id);
-        el.addEventListener('input', runVolumeCalc);
-        el.addEventListener('change', runVolumeCalc);
+    const calcSectionsEl = document.getElementById('calc-sections');
+    calcSectionsEl.addEventListener('input', runVolumeCalc);
+    calcSectionsEl.addEventListener('change', runVolumeCalc);
+    calcSectionsEl.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('.btn-remove-section');
+        if (!removeBtn) return;
+        removeBtn.closest('.calc-section-card').remove();
+        [...calcSectionsEl.children].forEach((card, i) => {
+            card.querySelector('.calc-section-header span').textContent = `Section #${i + 1}`;
+        });
+        runVolumeCalc();
     });
+
+    document.getElementById('calc-purpose').addEventListener('change', () => {
+        const isConcrete = document.getElementById('calc-purpose').value === 'concrete';
+        document.getElementById('calc-wastage-wrap').style.display = isConcrete ? 'inline-flex' : 'none';
+        runVolumeCalc();
+    });
+
+    document.getElementById('calc-wastage').addEventListener('change', runVolumeCalc);
 
     document.getElementById('btn-apply-calc').addEventListener('click', () => {
-        const purpose = document.getElementById('calc-purpose').value;
-        if (purpose === 'filling' && state.selectedMaterial?.id !== 'escombro') {
-            const escombroCard = document.querySelector('.mat-card[data-id="escombro"]');
-            if (escombroCard) escombroCard.click();
-        } else if (purpose === 'concrete' && state.selectedMaterial?.id === 'escombro') {
-            const gravelCard = document.querySelector('.mat-card[data-id="gravel"]');
-            if (gravelCard) gravelCard.click();
+        const result = runVolumeCalc();
+        if (!result || result.totalVol <= 0) {
+            alert("Please enter valid dimensions in at least one section first.");
+            return;
         }
 
-        const loads = runVolumeCalc();
-        document.getElementById('supply-qty').value = loads;
+        Object.keys(state.materialQtys).forEach(k => { state.materialQtys[k] = 0; });
+
+        if (result.purpose === 'concrete') {
+            if ('sand' in state.materialQtys) state.materialQtys.sand = result.sandLoads;
+            if ('gravel' in state.materialQtys) state.materialQtys.gravel = result.gravelLoads;
+        } else if (result.purpose === 'filling') {
+            if ('escombro' in state.materialQtys) state.materialQtys.escombro = result.loads;
+        } else {
+            if ('gravel' in state.materialQtys) state.materialQtys.gravel = result.loads;
+            else if ('sand' in state.materialQtys) state.materialQtys.sand = result.loads;
+        }
+
+        renderMaterialCards();
         calcSupply();
     });
 
@@ -469,64 +571,136 @@ function toMeters(val, unit) {
     return val;
 }
 
-function syncCalculatorWithMaterial(matId) {
-    const purposeEl = document.getElementById('calc-purpose');
-    if (!purposeEl) return;
+function renderMaterialCards() {
+    const matGrid = document.getElementById('material-list');
+    const availableMaterials = appData.materials.filter(m => m.inStock);
 
-    if (matId === 'escombro') {
-        purposeEl.value = 'filling';
-    } else if (purposeEl.value === 'filling') {
-        purposeEl.value = 'concrete';
-    }
+    matGrid.innerHTML = availableMaterials.map(m => {
+        const qty = state.materialQtys[m.id] || 0;
+        return `
+            <div class="mat-card ${qty > 0 ? 'selected' : ''}" data-id="${m.id}">
+                <div class="mat-card-top">
+                    <h4>${m.name}</h4>
+                    <p>₱${m.price.toLocaleString()}/load</p>
+                </div>
+                <div class="mat-card-stepper">
+                    <button type="button" class="mat-step-minus" data-id="${m.id}" aria-label="Decrease ${m.name}">−</button>
+                    <span>${qty} load${qty === 1 ? '' : 's'}</span>
+                    <button type="button" class="mat-step-plus" data-id="${m.id}" aria-label="Increase ${m.name}">+</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function addCalcSectionRow() {
+    const container = document.getElementById('calc-sections');
+    const index = container.children.length + 1;
+    const row = document.createElement('div');
+    row.className = 'calc-section-card';
+    row.innerHTML = `
+        <div class="calc-section-header">
+            <span>Section #${index}</span>
+            ${index > 1 ? '<button type="button" class="btn-remove-section">Remove ×</button>' : ''}
+        </div>
+        <div class="calc-section-grid">
+            <div>
+                <span class="calc-field-label">Qty (Units)</span>
+                <input type="number" class="calc-qty-input calc-sec-qty" value="1" min="1" step="1">
+            </div>
+            <div>
+                <span class="calc-field-label">Length</span>
+                <div class="calc-dim-pair">
+                    <input type="number" class="calc-sec-l" placeholder="0" step="0.01" min="0">
+                    <select class="calc-sec-l-unit">
+                        <option value="m" selected>m</option>
+                        <option value="ft">ft</option>
+                        <option value="in">in</option>
+                        <option value="cm">cm</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <span class="calc-field-label">Width</span>
+                <div class="calc-dim-pair">
+                    <input type="number" class="calc-sec-w" placeholder="0" step="0.01" min="0">
+                    <select class="calc-sec-w-unit">
+                        <option value="m" selected>m</option>
+                        <option value="ft">ft</option>
+                        <option value="in">in</option>
+                        <option value="cm">cm</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <span class="calc-field-label">Depth / Thick.</span>
+                <div class="calc-dim-pair">
+                    <input type="number" class="calc-sec-d" placeholder="0" step="0.01" min="0">
+                    <select class="calc-sec-d-unit">
+                        <option value="in" selected>in</option>
+                        <option value="m">m</option>
+                        <option value="ft">ft</option>
+                        <option value="cm">cm</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(row);
 }
 
 function runVolumeCalc() {
-    const lRaw = parseFloat(document.getElementById('calc-l').value || 0);
-    const wRaw = parseFloat(document.getElementById('calc-w').value || 0);
-    const dRaw = parseFloat(document.getElementById('calc-d').value || 0);
-
-    const l = toMeters(lRaw, document.getElementById('calc-l-unit').value);
-    const w = toMeters(wRaw, document.getElementById('calc-w-unit').value);
-    const d = toMeters(dRaw, document.getElementById('calc-d-unit').value);
-
     const purpose = document.getElementById('calc-purpose').value;
     const breakdown = document.getElementById('calc-breakdown');
+    const rows = document.querySelectorAll('#calc-sections .calc-section-card');
 
-    if (!l || !w || !d) {
+    let rawVol = 0;
+    rows.forEach(row => {
+        const qty = Math.max(1, parseFloat(row.querySelector('.calc-sec-qty').value || 1));
+        const l = toMeters(parseFloat(row.querySelector('.calc-sec-l').value || 0), row.querySelector('.calc-sec-l-unit').value);
+        const w = toMeters(parseFloat(row.querySelector('.calc-sec-w').value || 0), row.querySelector('.calc-sec-w-unit').value);
+        const d = toMeters(parseFloat(row.querySelector('.calc-sec-d').value || 0), row.querySelector('.calc-sec-d-unit').value);
+        if (l > 0 && w > 0 && d > 0) {
+            rawVol += qty * l * w * d;
+        }
+    });
+
+    if (rawVol <= 0) {
         breakdown.innerHTML = 'Enter dimensions above to estimate loads.';
-        return 1;
+        return null;
     }
 
-    const rawVol = l * w * d;
-
     if (purpose === 'concrete') {
-        const sandVol = rawVol * 0.50;
-        const gravelVol = rawVol * 1.00;
+        const addWastage = document.getElementById('calc-wastage').checked;
+        const adjVol = addWastage ? rawVol * 1.05 : rawVol;
+        const sandVol = adjVol * 0.50;
+        const gravelVol = adjVol * 1.00;
         const sandLoads = Math.max(1, Math.ceil(sandVol / 2.8));
         const gravelLoads = Math.max(1, Math.ceil(gravelVol / 2.8));
-
-        const isSand = state.selectedMaterial?.id === 'sand';
-        const targetLoads = isSand ? sandLoads : gravelLoads;
-        const targetLabel = isSand ? 'Washed Sand' : 'Crushed Gravel';
+        const cementBags = Math.ceil(adjVol * 9);
 
         breakdown.innerHTML = `
-            Total Concrete: <strong>${rawVol.toFixed(2)} cu.m.</strong><br>
-            • Washed Sand: <strong>${sandVol.toFixed(2)} cu.m.</strong> (${sandLoads} load${sandLoads > 1 ? 's' : ''})<br>
-            • Crushed Gravel: <strong>${gravelVol.toFixed(2)} cu.m.</strong> (${gravelLoads} load${gravelLoads > 1 ? 's' : ''})<br>
-            <span style="display:inline-block; margin-top:4px; color:var(--purple-dark);">
-                ↳ <strong>Apply</strong> sets <strong>${targetLoads} load${targetLoads > 1 ? 's' : ''}</strong> of <strong>${targetLabel}</strong> (order the other aggregate separately or add a note).
+            Total Concrete${addWastage ? ' (+5% wastage)' : ''}: <strong>${adjVol.toFixed(2)} cu.m.</strong><br>
+            • Washed Sand: <strong>${sandVol.toFixed(2)} cu.m.</strong> (<strong>${sandLoads} load${sandLoads > 1 ? 's' : ''}</strong>)<br>
+            • Crushed Gravel: <strong>${gravelVol.toFixed(2)} cu.m.</strong> (<strong>${gravelLoads} load${gravelLoads > 1 ? 's' : ''}</strong>)<br>
+            <span style="display:inline-block; margin-top:4px; color:var(--text-muted); font-size:0.78rem;">
+                Hardware ref: ~<strong>${cementBags} bags</strong> of 40kg cement (at 9 bags/cu.m.)
             </span>
         `;
-        return targetLoads;
+        return { purpose, totalVol: adjVol, sandLoads, gravelLoads };
     }
 
     const factor = purpose === 'filling' ? 1.25 : 1.10;
     const label = purpose === 'filling' ? 'incl. 25% compaction' : 'incl. 10% leveling';
+    const targetName = purpose === 'filling' ? 'Filling (Escombro)' : 'Crushed Gravel';
     const reqVol = rawVol * factor;
     const loads = Math.max(1, Math.ceil(reqVol / 2.8));
 
-    breakdown.innerHTML = `Required (${label}): <strong>${reqVol.toFixed(2)} cu.m.</strong> (<strong>${loads} load${loads > 1 ? 's' : ''}</strong>)`;
-    return loads;
+    breakdown.innerHTML = `
+        Required (${label}): <strong>${reqVol.toFixed(2)} cu.m.</strong><br>
+        • ${targetName}: <strong>${loads} load${loads > 1 ? 's' : ''}</strong>
+    `;
+    return { purpose, totalVol: reqVol, loads };
 }
 
 function getFee(selectId) {
@@ -534,17 +708,28 @@ function getFee(selectId) {
     return parseFloat(sel.options[sel.selectedIndex]?.dataset.fee || 0);
 }
 
+function getSelectedMaterials() {
+    return appData.materials
+        .filter(m => m.inStock && (state.materialQtys[m.id] || 0) > 0)
+        .map(m => ({ ...m, qty: state.materialQtys[m.id] }));
+}
+
 function calcSupply() {
-    if (!state.selectedMaterial) return;
-    const qty = parseInt(document.getElementById('supply-qty').value, 10);
-    const matCost = state.selectedMaterial.price * qty;
-    const delFee = getFee('supply-brgy');
+    const selected = getSelectedMaterials();
+    const totalLoads = selected.reduce((sum, item) => sum + item.qty, 0);
+    const matCost = selected.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const unitDelFee = getFee('supply-brgy');
+    const delFee = totalLoads > 0 ? unitDelFee * totalLoads : 0;
     const total = matCost + delFee;
 
     document.getElementById('supply-mat-cost').innerText = `₱${matCost.toLocaleString()}`;
-    document.getElementById('supply-del-fee').innerText = `₱${delFee.toLocaleString()}`;
+    document.getElementById('supply-del-fee').innerText = unitDelFee > 0 && totalLoads > 1
+        ? `₱${delFee.toLocaleString()} (₱${unitDelFee.toLocaleString()} × ${totalLoads})`
+        : `₱${delFee.toLocaleString()}`;
     document.getElementById('supply-total').innerText = `₱${total.toLocaleString()}`;
-    document.getElementById('supply-vol-estimate').innerText = `Approx. ${(qty * 2.8).toFixed(1)} - ${(qty * 3.0).toFixed(1)} cu.m.`;
+    document.getElementById('supply-vol-estimate').innerText = totalLoads > 0
+        ? `${totalLoads} Load${totalLoads > 1 ? 's' : ''} (~${(totalLoads * 2.8).toFixed(1)} – ${(totalLoads * 3.0).toFixed(1)} cu.m.)`
+        : '0 Loads selected';
 }
 
 function calcHauling() {
@@ -577,8 +762,8 @@ function calcRental() {
 }
 
 window.prepareCheckout = function (tab) {
-    if (tab === 'supply' && !state.selectedMaterial) {
-        alert("No material is currently available to order.");
+    if (tab === 'supply' && getSelectedMaterials().length === 0) {
+        alert("Please select at least 1 load of material.");
         return;
     }
 
@@ -649,12 +834,14 @@ async function handleCheckoutSubmit(e) {
         let summaryText = `*GBC ORDER TICKET: ${ticketId}*\nName: ${cust.name}\nPhone: ${cust.phone}\nAddress: ${cust.address}\n\n*ORDER DETAILS:*\n`;
 
         if (state.checkoutTab === 'supply') {
-            const qty = document.getElementById('supply-qty').value;
+            const selected = getSelectedMaterials();
+            const totalLoads = selected.reduce((sum, item) => sum + item.qty, 0);
+            const itemSummary = selected.map(item => `${item.name} (${item.qty} load${item.qty > 1 ? 's' : ''})`).join(', ');
             const brgy = document.getElementById('supply-brgy').value;
             const date = document.getElementById('supply-date').value;
             const total = document.getElementById('supply-total').innerText;
-            orderData.details = { material: state.selectedMaterial.name, qty, brgy, date, total };
-            summaryText += `Service: Supply Delivery\nItem: ${state.selectedMaterial.name}\nLoads: ${qty}\nBarangay: ${brgy}\nDate: ${date}\n*Total Est: ${total}*`;
+            orderData.details = { material: itemSummary, qty: totalLoads, brgy, date, total };
+            summaryText += `Service: Supply Delivery\nItems: ${itemSummary}\nTotal Loads: ${totalLoads}\nBarangay: ${brgy}\nDate: ${date}\n*Total Est: ${total}*`;
         } else if (state.checkoutTab === 'hauling') {
             const type = document.getElementById('hauling-type').value;
             const qty = document.getElementById('hauling-qty').value;

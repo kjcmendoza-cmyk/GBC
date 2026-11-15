@@ -65,7 +65,39 @@ export const DbService = {
         });
         return docRef.id;
     },
+async updateOrderDetails(id, newQty, newTotal) {
+        if (DEMO_MODE) {
+            const orders = JSON.parse(localStorage.getItem('gbc_orders') || '[]');
+            const idx = orders.findIndex(o => o.id === id);
+            if (idx > -1 && orders[idx].details) {
+                orders[idx].details.qty = newQty;
+                orders[idx].details.total = newTotal;
+            }
+            localStorage.setItem('gbc_orders', JSON.stringify(orders));
+            return;
+        }
+        await updateDoc(doc(db, "bookings", id), {
+            "details.qty": newQty,
+            "details.total": newTotal
+        });
+    },
 
+    async getAvailability() {
+        if (DEMO_MODE) {
+            const data = localStorage.getItem('gbc_availability');
+            return data ? JSON.parse(data) : {};
+        }
+        const snap = await getDoc(doc(db, "settings", "availability"));
+        return snap.exists() ? snap.data() : {};
+    },
+
+    async saveAvailability(availabilityMap) {
+        if (DEMO_MODE) {
+            localStorage.setItem('gbc_availability', JSON.stringify(availabilityMap));
+            return;
+        }
+        await setDoc(doc(db, "settings", "availability"), availabilityMap);
+    },
     async getOrders(statusFilter = "All") {
         if (DEMO_MODE) {
             let orders = JSON.parse(localStorage.getItem('gbc_orders') || '[]');
@@ -112,14 +144,14 @@ export const DbService = {
         await setDoc(doc(db, "settings", "global"), settings);
     },
 
-    async uploadHaulingPhoto(blob, ticketId, index) {
-        if (DEMO_MODE) {
-            return URL.createObjectURL(blob);
-        }
-        const fileRef = ref(storage, `hauling-photos/${ticketId}_${index}.jpg`);
-        await uploadBytes(fileRef, blob, { contentType: 'image/jpeg' });
-        return await getDownloadURL(fileRef);
-    },
+    async uploadHaulingPhoto(blob) {
+    return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Failed to encode photo'));
+        reader.readAsDataURL(blob);
+    });
+},
 
     async getBlockedDates() {
         if (DEMO_MODE) {

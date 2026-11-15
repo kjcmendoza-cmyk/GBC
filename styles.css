@@ -1129,3 +1129,147 @@ input:focus, select:focus, textarea:focus {
     color: #B91C1C;
     border: 1px solid #FECACA;
 }
+/* =========================================
+   MULTI-MATERIAL CARDS & MULTI-SECTION CALC
+   ========================================= */
+.mat-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.75rem;
+    cursor: default;
+}
+
+.mat-card-top {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.mat-card-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #F8FAFC;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.mat-card.selected .mat-card-stepper {
+    background: white;
+    border-color: var(--green-border);
+}
+
+.mat-card-stepper button {
+    background: var(--purple-soft);
+    border: none;
+    width: 38px;
+    height: 34px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--purple-dark);
+    cursor: pointer;
+    transition: 0.15s;
+}
+
+.mat-card-stepper button:hover {
+    background: var(--green-main);
+    color: white;
+}
+
+.mat-card-stepper span {
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--text-dark);
+}
+
+.calc-section-card {
+    background: #FAFAFF;
+    border: 1px solid var(--purple-border);
+    border-radius: 9px;
+    padding: 0.65rem;
+    margin-bottom: 0.55rem;
+}
+
+.calc-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.45rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--purple-dark);
+}
+
+.btn-remove-section {
+    background: none;
+    border: none;
+    color: #B91C1C;
+    font-weight: 700;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.calc-section-grid {
+    display: grid;
+    grid-template-columns: 72px repeat(3, 1fr);
+    gap: 0.45rem;
+}
+
+.calc-field-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 2px;
+}
+
+.calc-dim-pair {
+    display: flex;
+    gap: 3px;
+}
+
+.calc-dim-pair input,
+.calc-qty-input {
+    padding: 0.48rem 0.45rem;
+    font-size: 0.86rem;
+}
+
+.calc-dim-pair select {
+    width: 58px;
+    padding: 0.48rem 0.25rem;
+    font-size: 0.82rem;
+    flex-shrink: 0;
+}
+
+.btn-link-purple {
+    background: none;
+    border: none;
+    color: var(--purple-main);
+    font-weight: 700;
+    font-size: 0.82rem;
+    cursor: pointer;
+    padding: 0.2rem 0;
+}
+
+.btn-link-purple:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 560px) {
+    .mat-card {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .mat-card-stepper {
+        width: 122px;
+        flex-shrink: 0;
+    }
+
+    .calc-section-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}

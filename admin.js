@@ -93,6 +93,8 @@ async function showDashboard() {
     });
 
     document.getElementById('status-filter').addEventListener('change', loadOrders);
+    document.getElementById('date-filter').addEventListener('change', loadOrders);
+    document.getElementById('order-search').addEventListener('input', loadOrders);
 
     // Manual Block Date Submit
     document.getElementById('block-form').addEventListener('submit', async (e) => {
@@ -103,13 +105,15 @@ async function showDashboard() {
 
         try {
             const resource = document.getElementById('block-resource').value;
+            const units = document.getElementById('block-units').value;
             const date = document.getElementById('block-date').value;
             const notes = document.getElementById('block-notes').value.trim();
 
-            await DbService.addBlockedDate({ resource, date, notes });
+            await DbService.addBlockedDate({ resource, units, date, notes });
             e.target.reset();
             closeModal('block-date-modal');
             await loadBlockedDates();
+            await syncFleetAvailability();
         } catch (err) {
             alert("Failed to block date: " + err.message);
         } finally {
@@ -183,18 +187,117 @@ window.removeBlockedDate = async function(id) {
     if (!confirm("Remove this blocked date?")) return;
     await DbService.deleteBlockedDate(id);
     await loadBlockedDates();
+    await syncFleetAvailability();
 };
+function addDaysToDateStr(dateStr, daysToAdd) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + daysToAdd);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
 
+async function syncFleetAvailability() {
+    try {
+        const [allOrders, blocks] = await Promise.all([
+            DbService.getOrders('All'),
+            DbService.getBlockedDates()
+        ]);
+
+        const usage = {};
+        const ensureDate = (d) => {
+            if (!usage[d]) usage[d] = { trucks: 0, backhoes: 0, fullBlockTruck: false, fullBlockBackhoe: false, notes: {} };
+        };
+
+        // Count confirmed orders against fleet capacity
+        allOrders.filter(o => o.status === 'confirmed' && o.details?.date).forEach(o => {
+            const start = o.details.date;
+            if (o.type === 'supply') {
+                ensureDate(start);
+                usage[start].trucks += 1;
+            } else if (o.type === 'hauling') {
+                ensureDate(start);
+                usage[start].trucks += 1;
+                if (o.details.hasBackhoe) usage[start].backhoes += 1;
+            } else if (o.type === 'rental') {
+                const days = Math.max(1, parseInt(o.details.days || 1, 10));
+                for (let i = 0; i < days; i++) {
+                    const dayStr = addDaysToDateStr(start, i);
+                    ensureDate(dayStr);
+                    usage[dayStr].backhoes += 1;
+                }
+                if (o.details.hasHaul) {
+                    ensureDate(start);
+                    usage[start].trucks += 1;
+                }
+            }
+        });
+
+        // Apply manual blocks
+        blocks.forEach(b => {
+            if (!b.date) return;
+            ensureDate(b.date);
+            const isAll = !b.units || b.units === 'all';
+            if (b.resource === 'backhoe') {
+                if (isAll) usage[b.date].fullBlockBackhoe = true;
+                else usage[b.date].backhoes += 1;
+                if (b.notes) usage[b.date].notes.backhoe = b.notes;
+            } else {
+                if (isAll) usage[b.date].fullBlockTruck = true;
+                else usage[b.date].trucks += 1;
+                if (b.notes) usage[b.date].notes.truck = b.notes;
+            }
+        });
+
+        await DbService.saveAvailability(usage);
+    } catch (err) {
+        console.error("Fleet sync error:", err);
+    }
+}
+
+window.editOrderQuote = async function(id, currentQty, currentTotal) {
+    const newQtyStr = prompt("Enter verified number of loads:", currentQty || 1);
+    if (newQtyStr === null) return;
+    const newQty = Math.max(1, parseInt(newQtyStr, 10) || 1);
+
+    const newTotal = prompt("Enter updated total estimate (e.g. ₱4,500):", currentTotal || "₱0");
+    if (newTotal === null || !newTotal.trim()) return;
+
+    try {
+        await DbService.updateOrderDetails(id, newQty, newTotal.trim());
+        await loadOrders();
+    } catch (err) {
+        alert("Failed to update order: " + err.message);
+    }
+};
 async function loadOrders() {
     const filter = document.getElementById('status-filter').value;
+    const dateFilter = document.getElementById('date-filter')?.value || 'all';
+    const search = (document.getElementById('order-search')?.value || '').trim().toLowerCase();
     const container = document.getElementById('orders-list');
     container.innerHTML = `<p class="sub-text" style="text-align:center; padding: 1rem 0;">Loading orders...</p>`;
 
     try {
-        const orders = await DbService.getOrders(filter);
+        let orders = await DbService.getOrders(filter);
+        await syncFleetAvailability();
+
+        const now = new Date();
+        const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        const tomorrow = addDaysToDateStr(today, 1);
+
+        if (dateFilter === 'today') orders = orders.filter(o => o.details?.date === today);
+        else if (dateFilter === 'tomorrow') orders = orders.filter(o => o.details?.date === tomorrow);
+        else if (dateFilter === 'upcoming') orders = orders.filter(o => (o.details?.date || '') >= today);
+
+        if (search) {
+            orders = orders.filter(o =>
+                (o.ticketId || '').toLowerCase().includes(search) ||
+                (o.customer?.name || '').toLowerCase().includes(search) ||
+                (o.details?.brgy || '').toLowerCase().includes(search) ||
+                (o.customer?.phone || '').includes(search)
+            );
+        }
 
         if (orders.length === 0) {
-            container.innerHTML = `<p class="sub-text" style="text-align:center; padding: 1.5rem 0;">No orders found for this filter.</p>`;
+            container.innerHTML = `<p class="sub-text" style="text-align:center; padding: 1.5rem 0;">No orders found matching your filters.</p>`;
             return;
         }
 
@@ -218,6 +321,11 @@ async function loadOrders() {
                 </div>
             ` : '';
 
+            const waPhone = (o.customer?.phone || '').replace(/^0/, '63');
+            const waMsg = encodeURIComponent(
+                `Hello ${o.customer?.name || ''}! Your GBC Davao booking (${o.ticketId}) for ${o.details?.date || 'your scheduled date'} is CONFIRMED. Total Est: ${o.details?.total || ''}. Thank you!`
+            );
+
             return `
                 <div class="order-card">
                     <div class="order-header">
@@ -235,9 +343,11 @@ async function loadOrders() {
                         ${detailItems}
                     </ul>
                     ${photosHtml}
-                    <div style="margin-top: 14px; display: flex; gap: 10px;">
+                    <div style="margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px;">
                         ${o.status === 'pending' ? `<button class="btn btn-primary" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${escapeHtml(o.id)}', 'confirmed')">Confirm</button>` : ''}
                         ${o.status === 'confirmed' ? `<button class="btn btn-whatsapp" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${escapeHtml(o.id)}', 'completed')">Complete</button>` : ''}
+                        ${o.status === 'confirmed' && waPhone ? `<a href="https://wa.me/${escapeHtml(waPhone)}?text=${waMsg}" target="_blank" rel="noopener" class="btn btn-secondary" style="flex:1; padding: 0.55rem; text-decoration:none;">WhatsApp</a>` : ''}
+                        ${(o.status === 'pending' || o.status === 'confirmed') && o.type !== 'rental' ? `<button class="btn btn-purple-outline" style="padding: 0.55rem 0.75rem;" onclick="editOrderQuote('${escapeHtml(o.id)}', '${escapeHtml(o.details?.qty || 1)}', '${escapeHtml(o.details?.total || '')}')">Edit Qty/₱</button>` : ''}
                         ${o.status !== 'completed' && o.status !== 'cancelled' ? `<button class="btn btn-secondary" style="flex:1; padding: 0.55rem;" onclick="updateStatus('${escapeHtml(o.id)}', 'cancelled')">Cancel</button>` : ''}
                     </div>
                 </div>

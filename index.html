@@ -92,20 +92,13 @@
             </div>
             <p class="sub-text">Select your construction aggregate below for instant barangay delivery pricing.</p>
             
-            <div class="material-grid" id="material-list">
-                <!-- Injected via app.js -->
+            <div class="section-header" style="margin-bottom: 0.65rem;">
+                <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-dark);">Select Loads per Material</span>
+                <small id="supply-vol-estimate" class="vol-pill">1 Load (~2.8 – 3.0 cu.m.)</small>
             </div>
 
-            <div class="form-card stepper-group">
-                <div class="stepper-label-wrap">
-                    <label>Number of Dump Truck Loads</label>
-                    <small id="supply-vol-estimate" class="vol-pill">Approx. 2.8 - 3.0 cu.m.</small>
-                </div>
-                <div class="stepper">
-                    <button type="button" class="btn-step" id="supply-minus" aria-label="Decrease loads">−</button>
-                    <input type="number" id="supply-qty" value="1" min="1" readonly>
-                    <button type="button" class="btn-step" id="supply-plus" aria-label="Increase loads">+</button>
-                </div>
+            <div class="material-grid" id="material-list">
+                <!-- Injected via app.js -->
             </div>
 
             <details class="volume-helper">
@@ -116,72 +109,41 @@
                         </span>
                         <div>
                             <span class="calc-q">Not sure how many loads?</span>
-                            <strong>Open Volume Calculator</strong>
+                            <strong>Open Foreman Volume Calculator</strong>
                         </div>
                     </div>
                     <span class="chevron">▾</span>
                 </summary>
                 <div class="helper-content">
-                    <p class="helper-hint">Select your project type and dimensions (supports m, ft, in, cm):</p>
+                    <p class="helper-hint">Select project type and enter dimensions (supports m, ft, in, cm):</p>
 
                     <div class="form-group" style="margin-bottom: 0.65rem;">
                         <select id="calc-purpose">
-                            <option value="concrete">Concrete Pour (1:2:4 Mix — Slab / Footing / Wall)</option>
+                            <option value="concrete">Concrete Pour (1:2:4 Mix — Slab / Footing / Column)</option>
                             <option value="filling">Lot Filling / Backfill (Escombro +25% Compaction)</option>
                             <option value="bedding">Gravel Driveway / Sand Bedding (+10% Leveling)</option>
                         </select>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;">
-                        <div>
-                            <small style="display:block; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Length</small>
-                            <div style="display:flex; gap:4px;">
-                                <input type="number" id="calc-l" placeholder="0" step="0.01" min="0">
-                                <select id="calc-l-unit" style="width:68px; padding:0.5rem 0.35rem;">
-                                    <option value="m" selected>m</option>
-                                    <option value="ft">ft</option>
-                                    <option value="in">in</option>
-                                    <option value="cm">cm</option>
-                                </select>
-                            </div>
-                        </div>
+                    <div id="calc-sections"></div>
 
-                        <div>
-                            <small style="display:block; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Width</small>
-                            <div style="display:flex; gap:4px;">
-                                <input type="number" id="calc-w" placeholder="0" step="0.01" min="0">
-                                <select id="calc-w-unit" style="width:68px; padding:0.5rem 0.35rem;">
-                                    <option value="m" selected>m</option>
-                                    <option value="ft">ft</option>
-                                    <option value="in">in</option>
-                                    <option value="cm">cm</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div>
-                            <small style="display:block; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Depth / Thickness</small>
-                            <div style="display:flex; gap:4px;">
-                                <input type="number" id="calc-d" placeholder="0" step="0.01" min="0">
-                                <select id="calc-d-unit" style="width:68px; padding:0.5rem 0.35rem;">
-                                    <option value="in" selected>in</option>
-                                    <option value="m">m</option>
-                                    <option value="ft">ft</option>
-                                    <option value="cm">cm</option>
-                                </select>
-                            </div>
-                        </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;">
+                        <button type="button" id="btn-add-section" class="btn-link-purple">+ Add Another Section</button>
+                        <label id="calc-wastage-wrap" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; font-weight:600; color:var(--text-dark); cursor:pointer;">
+                            <input type="checkbox" id="calc-wastage" checked style="width:15px; height:15px; accent-color:var(--green-main);">
+                            <span>+5% Concrete Wastage</span>
+                        </label>
                     </div>
 
                     <div class="calc-footer">
-                        <div id="calc-breakdown" style="font-size:0.84rem; line-height:1.45;">
+                        <div id="calc-breakdown" style="font-size:0.84rem; line-height:1.45; flex:1; min-width:210px;">
                             Enter dimensions above to estimate loads.
                         </div>
-                        <button type="button" id="btn-apply-calc" class="btn btn-purple-outline">Apply to Order</button>
+                        <button type="button" id="btn-apply-calc" class="btn btn-purple-outline">Apply All to Order</button>
                     </div>
 
                     <small style="display:block; margin-top:0.65rem; padding-top:0.55rem; border-top:1px dashed var(--purple-border); color:var(--text-muted); font-size:0.76rem; line-height:1.4;">
-                        *Guide only (~2.8 cu.m./load). Actual loads vary with ground slope, moisture, and compaction, please confirm with your mason or foreman before ordering.
+                        *Guide only (~2.8 cu.m./load). Actual loads vary with ground slope, moisture, and compaction; please confirm with your mason or foreman before ordering.
                     </small>
                 </div>
             </details>
